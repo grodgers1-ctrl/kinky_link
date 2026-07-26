@@ -1,4 +1,5 @@
 import { google } from "googleapis"
+import crypto from "crypto"
 
 interface SendEmailParams {
   to: string
@@ -23,7 +24,7 @@ export async function sendGmailEmail(params: SendEmailParams) {
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client })
 
-  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  const boundary = `boundary_${crypto.randomUUID()}`
   const headers = [
     `To: ${params.to}`,
     `Subject: =?UTF-8?B?${Buffer.from(params.subject).toString("base64")}?=`,
@@ -43,7 +44,6 @@ export async function sendGmailEmail(params: SendEmailParams) {
     params.bodyText,
     `--${boundary}`,
     "Content-Type: text/html; charset=UTF-8",
-    "Content-Transfer-Encoding: quoted-printable",
     "",
     params.bodyHtml,
     `--${boundary}--`,
@@ -73,5 +73,6 @@ export function injectTrackedLinks(html: string, messageId: string, baseUrl: str
 
 export function injectTrackingPixel(html: string, messageId: string, baseUrl: string): string {
   const pixel = `<img src="${baseUrl}/api/track/open/${messageId}" width="1" height="1" style="display:none;" alt=""/>`
-  return html.replace("</body>", `${pixel}</body>`)
+  if (html.includes("</body>")) return html.replace("</body>", `${pixel}</body>`)
+  return html + pixel
 }
