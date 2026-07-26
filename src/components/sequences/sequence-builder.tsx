@@ -29,7 +29,7 @@ export function SequenceBuilder({
   const [selectedProspects, setSelectedProspects] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
-  const updateStep = (index: number, field: string, value: any) => {
+  const updateStep = (index: number, field: string, value: string | number) => {
     setSteps((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)))
   }
 

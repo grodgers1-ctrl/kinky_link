@@ -8,19 +8,29 @@ export function CampaignEmailStats({ campaignId }: { campaignId: string }) {
     openRate: number
     totalClicks: number
   } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     fetch(`/api/campaigns/${campaignId}/stats`)
       .then((r) => r.json())
-      .then(setStats)
-      .catch(() => setStats(null))
+      .then((d) => {
+        if (d.error) { setError(d.error); setStats(null) }
+        else { setStats(d); setError("") }
+      })
+      .catch(() => setError("Failed to load stats"))
+      .finally(() => setLoading(false))
   }, [campaignId])
 
-  if (!stats) {
+  if (error) {
+    return <div className="rounded-lg border border-brand-accent bg-[#FFF0F2] p-3 text-sm text-brand-accent">{error}</div>
+  }
+
+  if (loading || !stats) {
     return (
       <div className="grid grid-cols-4 gap-3">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-100" />
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-brand-surface" />
         ))}
       </div>
     )

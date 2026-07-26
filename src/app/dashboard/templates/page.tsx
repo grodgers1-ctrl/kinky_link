@@ -2,7 +2,6 @@ import { auth } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/db"
 import { redirect } from "next/navigation"
 import { TemplateLibrary } from "@/components/templates/template-library"
-import { TemplateEditor } from "@/components/templates/template-editor"
 
 export default async function TemplatesPage() {
   const session = await auth()

@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/db"
 import { SEED_TEMPLATES } from "@/lib/seed-templates"
 import { NextRequest, NextResponse } from "next/server"
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 

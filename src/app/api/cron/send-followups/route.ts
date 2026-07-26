@@ -1,13 +1,17 @@
 import { supabaseAdmin } from "@/lib/db"
 import { sendGmailEmail, injectTrackedLinks, injectTrackingPixel } from "@/lib/email"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 
 const BASE_URL = process.env.AUTH_URL || "http://localhost:3000"
+const CRON_SECRET = process.env.CRON_SECRET
 
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (CRON_SECRET && req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   try {
     const { data: dueItems } = await supabaseAdmin
       .from("sequence_progress")

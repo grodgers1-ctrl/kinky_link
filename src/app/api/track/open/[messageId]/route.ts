@@ -15,11 +15,28 @@ export async function GET(
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
   const userAgent = req.headers.get("user-agent") || "unknown"
 
-  void supabaseAdmin.from("email_events").insert({
-    message_id: messageId,
-    event_type: "open",
-    metadata: { ip, userAgent },
-  })
+  try {
+    const { data: sentEvent } = await supabaseAdmin
+      .from("email_events")
+      .select("user_id, campaign_id, prospect_id, sequence_id")
+      .eq("message_id", messageId)
+      .eq("event_type", "sent")
+      .single()
+
+    if (sentEvent) {
+      await supabaseAdmin.from("email_events").insert({
+        user_id: sentEvent.user_id,
+        message_id: messageId,
+        campaign_id: sentEvent.campaign_id,
+        prospect_id: sentEvent.prospect_id,
+        sequence_id: sentEvent.sequence_id,
+        event_type: "open",
+        metadata: { ip, userAgent },
+      })
+    }
+  } catch {
+    // Log error but still return pixel
+  }
 
   return new NextResponse(TRANSPARENT_PIXEL, {
     headers: {

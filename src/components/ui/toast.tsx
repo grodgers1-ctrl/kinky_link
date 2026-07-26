@@ -51,7 +51,7 @@ function ToastItem({ toast, onDone }: { toast: Toast; onDone: () => void }) {
       className={cn(
         "animate-slide-up rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-all",
         toast.type === "success" && "bg-green-600 text-white",
-        toast.type === "error" && "bg-red-600 text-white",
+        toast.type === "error" && "bg-brand-accent text-white",
         toast.type === "warning" && "bg-yellow-500 text-white"
       )}
     >

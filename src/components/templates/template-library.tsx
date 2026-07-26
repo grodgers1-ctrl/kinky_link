@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/toast"
 
@@ -118,7 +118,7 @@ function UseTemplateDialog({
   onClose: () => void
   onSent: () => void
 }) {
-  const [template, setTemplate] = useState<any>(null)
+  const [template, setTemplate] = useState<{ name: string; subject: string; body_html: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [campaignId, setCampaignId] = useState("")
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([])
@@ -127,22 +127,23 @@ function UseTemplateDialog({
   const [body, setBody] = useState("")
   const [sending, setSending] = useState(false)
 
-  useState(() => {
-    fetch(`/api/templates?category=`)
-      .then((r) => r.json())
-      .then((d) => {
-        const t = (d.templates || []).find((t: any) => t.id === templateId)
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/templates").then((r) => r.json()),
+      fetch("/api/campaigns").then((r) => r.json()),
+    ])
+      .then(([tData, cData]) => {
+        const t = (tData.templates || []).find((t: { id: string }) => t.id === templateId)
         setTemplate(t)
         if (t) {
           setSubject(t.subject)
           setBody(t.body_html)
         }
+        setCampaigns(cData.campaigns || [])
       })
-    fetch("/api/campaigns")
-      .then((r) => r.json())
-      .then((d) => setCampaigns(d.campaigns || []))
+      .catch(() => {})
       .finally(() => setLoading(false))
-  })
+  }, [templateId])
 
   const handleSend = async () => {
     if (!recipient || !subject) return
@@ -153,7 +154,10 @@ function UseTemplateDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to: recipient, subject, bodyHtml: body, bodyText: "", campaignId: campaignId || undefined }),
       })
-      if (res.ok) onSent()
+      if (!res.ok) throw new Error("Send failed")
+      onSent()
+    } catch {
+      // error handled by parent
     } finally {
       setSending(false)
     }
