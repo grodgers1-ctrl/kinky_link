@@ -31,3 +31,15 @@ Brand assets and full guide at `public/brand/kinkylink_brand.md`.
 - **Logo:** `public/brand/kinklink_logo.png`
 - **Tailwind theme vars:** `--color-brand-{primary,secondary,accent,surface,text,white}`
 <!-- END:brand-guidelines -->
+
+<!-- BEGIN:code-review-learnings -->
+## Code Review Self-Improvement
+
+See `code-review-learnings.md` for lessons extracted from the Week 1 code review, covering:
+- Security (service-role client, request validation)
+- Error handling (try/catch, structured errors, UI feedback)
+- TypeScript (NextAuth type extensions, no `any[]`)
+- Next.js 16 conventions (NextRequest, async params)
+- Brand consistency (UI primitives use brand tokens)
+- UX states (loading, empty, error, inline edit feedback)
+<!-- END:code-review-learnings -->
