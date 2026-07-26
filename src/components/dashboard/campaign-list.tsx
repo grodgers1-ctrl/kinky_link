@@ -1,3 +1,4 @@
+import Link from "next/link"
 import type { CampaignWithSite } from "@/types"
 
 export function CampaignList({ campaigns }: { campaigns: CampaignWithSite[] }) {
@@ -24,7 +25,11 @@ export function CampaignList({ campaigns }: { campaigns: CampaignWithSite[] }) {
         <tbody>
           {campaigns.map((c) => (
             <tr key={c.id} className="border-b border-[#DCDDDE] text-brand-secondary last:border-0">
-              <td className="px-4 py-3 font-medium">{c.name}</td>
+              <td className="px-4 py-3 font-medium">
+                <Link href={`/dashboard/campaigns/${c.id}`} className="hover:text-brand-accent">
+                  {c.name}
+                </Link>
+              </td>
               <td className="px-4 py-3 text-[#575858]">{c.sites?.url || "—"}</td>
               <td className="px-4 py-3">
                 <span className="inline-block rounded-full bg-brand-primary px-3 py-0.5 text-xs font-medium text-brand-secondary">
