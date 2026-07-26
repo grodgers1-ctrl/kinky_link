@@ -34,7 +34,7 @@ export default async function DashboardPage() {
       {sites.map((site) => (
         <div key={site.id} className="space-y-2">
           <h2 className="text-h3 font-semibold text-brand-secondary">{site.url}</h2>
-          <GscSummary siteId={site.id} siteUrl={site.url} />
+          <GscSummary siteId={site.id} />
         </div>
       ))}
     </div>

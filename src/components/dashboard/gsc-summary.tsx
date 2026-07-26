@@ -9,17 +9,35 @@ interface GscRow {
   position?: number
 }
 
-export function GscSummary({ siteId, siteUrl }: { siteId: string; siteUrl: string }) {
+export function GscSummary({ siteId }: { siteId: string }) {
   const [rows, setRows] = useState<GscRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
+    setLoading(true)
+    setError("")
     fetch(`/api/sites/${siteId}/performance`)
       .then((r) => r.json())
-      .then((d) => setRows(d.rows || []))
-      .catch(() => setRows([]))
+      .then((d) => {
+        if (d.error) {
+          setError(d.error)
+          setRows([])
+        } else {
+          setRows(d.rows || [])
+        }
+      })
+      .catch(() => setError("Failed to load performance data"))
       .finally(() => setLoading(false))
   }, [siteId])
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-brand-accent bg-[#FFF0F2] p-4 text-sm text-brand-accent">
+        {error}
+      </div>
+    )
+  }
 
   const totalClicks = rows.reduce((s, r) => s + (r.clicks || 0), 0)
   const totalImpressions = rows.reduce((s, r) => s + (r.impressions || 0), 0)

@@ -1,30 +1,45 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import { ProspectRow } from "./prospect-row"
+import type { Prospect } from "@/types"
 
 export function ProspectsView({
   campaigns,
 }: {
   campaigns: { id: string; name: string }[]
 }) {
-  const [prospects, setProspects] = useState<any[]>([])
+  const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [campaignFilter, setCampaignFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [searchText, setSearchText] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [tagInput, setTagInput] = useState("")
+  const [tagging, setTagging] = useState(false)
 
   const fetchProspects = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams()
-    if (campaignFilter) params.set("campaignId", campaignFilter)
-    if (statusFilter) params.set("status", statusFilter)
-    if (searchText) params.set("search", searchText)
-    const res = await fetch(`/api/prospects?${params}`)
-    const data = await res.json()
-    setProspects(data.prospects || [])
-    setLoading(false)
+    setError("")
+    try {
+      const params = new URLSearchParams()
+      if (campaignFilter) params.set("campaignId", campaignFilter)
+      if (statusFilter) params.set("status", statusFilter)
+      if (searchText) params.set("search", searchText)
+      const res = await fetch(`/api/prospects?${params}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || "Failed to load")
+        setProspects([])
+      } else {
+        setProspects(data.prospects || [])
+      }
+    } catch {
+      setError("Failed to load prospects")
+      setProspects([])
+    } finally {
+      setLoading(false)
+    }
   }, [campaignFilter, statusFilter, searchText])
 
   useEffect(() => { fetchProspects() }, [fetchProspects])
@@ -34,26 +49,25 @@ export function ProspectsView({
     else setSelected(new Set(prospects.map((p) => p.id)))
   }
 
-  const toggle = (id: string) => {
-    const next = new Set(selected)
-    if (next.has(id)) { next.delete(id) } else { next.add(id) }
-    setSelected(next)
-  }
-
   const applyTag = async () => {
     if (!tagInput.trim() || selected.size === 0) return
-    for (const id of selected) {
-      const p = prospects.find((p) => p.id === id)
-      const tags = [...(p.tags || []), tagInput.trim()]
-      await fetch("/api/prospects", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, tags }),
-      })
+    setTagging(true)
+    try {
+      for (const id of selected) {
+        const p = prospects.find((p) => p.id === id)
+        const tags = [...(p?.tags || []), tagInput.trim()]
+        await fetch("/api/prospects", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, tags }),
+        })
+      }
+      setTagInput("")
+      setSelected(new Set())
+      fetchProspects()
+    } finally {
+      setTagging(false)
     }
-    setTagInput("")
-    setSelected(new Set())
-    fetchProspects()
   }
 
   return (
@@ -99,9 +113,15 @@ export function ProspectsView({
             onKeyDown={(e) => e.key === "Enter" && applyTag()}
             className="rounded border border-[#CCCCCD] bg-white px-2 py-1 text-sm"
           />
-          <button onClick={applyTag} className="rounded bg-brand-secondary px-3 py-1 text-xs font-medium text-brand-white">
-            Apply Tag
+          <button onClick={applyTag} disabled={tagging} className="rounded bg-brand-secondary px-3 py-1 text-xs font-medium text-brand-white">
+            {tagging ? "..." : "Apply Tag"}
           </button>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-brand-accent bg-[#FFF0F2] p-3 text-sm text-brand-accent">
+          {error}
         </div>
       )}
 

@@ -1,4 +1,6 @@
-export function CampaignList({ campaigns }: { campaigns: any[] }) {
+import type { CampaignWithSite } from "@/types"
+
+export function CampaignList({ campaigns }: { campaigns: CampaignWithSite[] }) {
   if (campaigns.length === 0) {
     return (
       <div className="rounded-xl border border-[#DCDDDE] bg-brand-white p-8 text-center">

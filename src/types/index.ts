@@ -44,3 +44,15 @@ export interface Prospect {
   created_at: string
   updated_at: string
 }
+
+export interface CampaignWithSite extends Campaign {
+  sites?: { url: string } | null
+}
+
+export interface ProspectSearchResult {
+  url: string
+  title: string
+  description: string
+  domain: string
+  domainAuthority: number | null
+}

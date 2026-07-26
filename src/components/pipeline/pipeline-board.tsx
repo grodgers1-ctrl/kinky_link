@@ -3,24 +3,38 @@ import { useState, useEffect } from "react"
 import { DndContext, DragEndEvent } from "@dnd-kit/core"
 import { PipelineColumn } from "./pipeline-column"
 import { useToast } from "@/components/ui/toast"
+import type { Prospect } from "@/types"
 
 const COLUMNS = [
-  { id: "prospect", label: "Prospects", color: "bg-gray-50" },
-  { id: "contacted", label: "Contacted", color: "bg-blue-50" },
-  { id: "replied", label: "Replied", color: "bg-yellow-50" },
-  { id: "live_link", label: "Live Link", color: "bg-green-50" },
+  { id: "prospect", label: "Prospects" },
+  { id: "contacted", label: "Contacted" },
+  { id: "replied", label: "Replied" },
+  { id: "live_link", label: "Live Link" },
 ]
 
 export function PipelineBoard() {
-  const [prospects, setProspects] = useState<any[]>([])
+  const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const { addToast } = useToast()
 
   const fetchProspects = async () => {
-    const res = await fetch("/api/prospects")
-    const data = await res.json()
-    setProspects(data.prospects || [])
-    setLoading(false)
+    setError("")
+    try {
+      const res = await fetch("/api/prospects")
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || "Failed to load")
+        setProspects([])
+      } else {
+        setProspects(data.prospects || [])
+      }
+    } catch {
+      setError("Failed to load pipeline")
+      setProspects([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { fetchProspects() }, [])
@@ -29,19 +43,38 @@ export function PipelineBoard() {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    const newStatus = over.id as string
+    const newStatus = over.id as Prospect["status"]
+    const prevProspects = [...prospects]
+
     setProspects((prev) =>
       prev.map((p) => (p.id === active.id ? { ...p, status: newStatus } : p))
     )
 
-    const res = await fetch("/api/prospects", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: active.id, status: newStatus }),
-    })
+    try {
+      const res = await fetch("/api/prospects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: active.id, status: newStatus }),
+      })
+      if (res.ok) {
+        addToast(`Moved to ${newStatus}`)
+      } else {
+        setProspects(prevProspects)
+        addToast("Failed to move prospect", "error")
+      }
+    } catch {
+      setProspects(prevProspects)
+      addToast("Failed to move prospect", "error")
+    }
+  }
 
-    if (res.ok) addToast(`Moved to ${newStatus}`)
-    else addToast("Failed to move prospect", "error")
+  if (error) {
+    return (
+      <div className="rounded-lg border border-brand-accent bg-[#FFF0F2] p-4 text-sm text-brand-accent">
+        {error}
+        <button onClick={fetchProspects} className="ml-3 underline">Retry</button>
+      </div>
+    )
   }
 
   if (loading) {
@@ -69,7 +102,6 @@ export function PipelineBoard() {
             key={col.id}
             id={col.id}
             label={col.label}
-            color={col.color}
             prospects={prospects.filter((p) => p.status === col.id)}
           />
         ))}

@@ -14,11 +14,19 @@ export function AddToCampaignDialog({
 }) {
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id || "")
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
 
   const handleConfirm = async () => {
     if (!campaignId) return
     setSaving(true)
-    try { await onConfirm(campaignId) } finally { setSaving(false) }
+    setError("")
+    try {
+      await onConfirm(campaignId)
+    } catch {
+      setError("Failed to add prospects. Try again.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -27,6 +35,8 @@ export function AddToCampaignDialog({
         <h2 className="text-h3 font-bold text-brand-secondary">
           Add {count} prospect{count > 1 ? "s" : ""}
         </h2>
+
+        {error && <p className="mt-2 text-sm text-brand-accent">{error}</p>}
 
         <div className="mt-4">
           <label className="text-sm font-medium text-[#575858]">Campaign</label>
@@ -44,6 +54,7 @@ export function AddToCampaignDialog({
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onClose}
+            disabled={saving}
             className="rounded-lg border border-[#CCCCCD] px-4 py-2 text-sm font-medium text-[#575858] hover:bg-brand-surface"
           >
             Cancel

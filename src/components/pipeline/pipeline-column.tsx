@@ -2,23 +2,22 @@
 import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { ProspectCard } from "./prospect-card"
+import type { Prospect } from "@/types"
 
 export function PipelineColumn({
   id,
   label,
-  color,
   prospects,
 }: {
   id: string
   label: string
-  color: string
-  prospects: any[]
+  prospects: Prospect[]
 }) {
   const { setNodeRef } = useDroppable({ id })
 
   return (
     <div className="flex flex-col rounded-xl border border-[#DCDDDE] bg-brand-white">
-      <div className={`flex items-center justify-between rounded-t-xl px-4 py-3 ${color}`}>
+      <div className="flex items-center justify-between rounded-t-xl bg-brand-surface px-4 py-3">
         <h3 className="text-sm font-medium text-brand-secondary">{label}</h3>
         <span className="rounded-full bg-brand-white px-2 py-0.5 text-xs font-medium text-[#575858]">
           {prospects.length}

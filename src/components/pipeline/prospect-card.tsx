@@ -1,8 +1,9 @@
 "use client"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import type { Prospect } from "@/types"
 
-export function ProspectCard({ prospect }: { prospect: any }) {
+export function ProspectCard({ prospect }: { prospect: Prospect }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: prospect.id,
   })
@@ -30,7 +31,7 @@ export function ProspectCard({ prospect }: { prospect: any }) {
       )}
       {(prospect.tags?.length || 0) > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {prospect.tags.slice(0, 2).map((t: string, i: number) => (
+          {prospect.tags.slice(0, 2).map((t, i) => (
             <span key={i} className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{t}</span>
           ))}
           {prospect.tags.length > 2 && (

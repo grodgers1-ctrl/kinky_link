@@ -1,10 +1,11 @@
 "use client"
 import { useState } from "react"
 import { ProspectTable } from "./prospect-table"
+import type { ProspectSearchResult } from "@/types"
 
 export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: string }[] }) {
   const [keyword, setKeyword] = useState("")
-  const [results, setResults] = useState<any[]>([])
+  const [results, setResults] = useState<ProspectSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -15,8 +16,12 @@ export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: s
     try {
       const res = await fetch(`/api/prospects/search?keyword=${encodeURIComponent(keyword)}`)
       const data = await res.json()
-      if (!res.ok) { setError(data.error || "Search failed"); setResults([]) }
-      else { setResults(data.results || []) }
+      if (!res.ok) {
+        setError(data.error || "Search failed")
+        setResults([])
+      } else {
+        setResults(data.results || [])
+      }
     } catch {
       setError("Failed to search. Try again.")
       setResults([])
@@ -45,7 +50,7 @@ export function ProspectSearch({ campaigns }: { campaigns: { id: string; name: s
       </div>
 
       {error && (
-        <div className="rounded-lg border border-[#FF224B] bg-[#FFF0F2] p-3 text-sm text-[#FF224B]">
+        <div className="rounded-lg border border-brand-accent bg-[#FFF0F2] p-3 text-sm text-brand-accent">
           {error}
         </div>
       )}

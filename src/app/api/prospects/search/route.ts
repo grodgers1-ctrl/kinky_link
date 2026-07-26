@@ -1,17 +1,25 @@
 import { auth } from "@/lib/auth"
 import { scrapeSerp } from "@/lib/scraper"
 import { getMozMetrics } from "@/lib/moz"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const { searchParams } = new URL(req.url)
-  const keyword = searchParams.get("keyword")
-  if (!keyword) return NextResponse.json({ error: "Keyword required" }, { status: 400 })
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   try {
+    const { searchParams } = new URL(req.url)
+    const keyword = searchParams.get("keyword")
+    if (!keyword) {
+      return NextResponse.json({ error: "Keyword required" }, { status: 400 })
+    }
+
+    if (keyword.length > 200) {
+      return NextResponse.json({ error: "Keyword too long" }, { status: 400 })
+    }
+
     const results = await scrapeSerp(keyword)
 
     const enriched = await Promise.all(

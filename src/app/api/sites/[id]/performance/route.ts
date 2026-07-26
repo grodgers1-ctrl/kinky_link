@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { getGscClient } from "@/lib/google"
+import { supabaseAdmin } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 
 function getDateString(daysAgo: number): string {
@@ -9,28 +10,28 @@ function getDateString(daysAgo: number): string {
 }
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
   const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const { supabase } = await import("@/lib/db")
-  const { data: site } = await supabase
-    .from("sites")
-    .select("url")
-    .eq("id", id)
-    .eq("user_id", session.user.id)
-    .single()
-
-  if (!site) return NextResponse.json({ error: "Site not found" }, { status: 404 })
+  if (!session?.user || !session.accessToken) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   try {
-    const gsc = getGscClient(
-      (session as any).accessToken as string,
-      (session as any).refreshToken as string
-    )
+    const { data: site } = await supabaseAdmin
+      .from("sites")
+      .select("url")
+      .eq("id", id)
+      .eq("user_id", session.user.id)
+      .single()
+
+    if (!site) {
+      return NextResponse.json({ error: "Site not found" }, { status: 404 })
+    }
+
+    const gsc = getGscClient(session.accessToken, session.refreshToken || "")
     const response = await gsc.searchanalytics.query({
       siteUrl: site.url,
       requestBody: {

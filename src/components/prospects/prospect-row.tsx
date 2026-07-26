@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import type { Prospect } from "@/types"
 
 const statusColors: Record<string, string> = {
   prospect: "bg-gray-100 text-gray-600",
@@ -10,7 +11,7 @@ const statusColors: Record<string, string> = {
   archived: "bg-zinc-100 text-zinc-500",
 }
 
-function DABadge({ da }: { da: number | null }) {
+function DABadge({ da }: { da: number | null | undefined }) {
   if (da == null) return <span className="text-xs text-[#999999]">—</span>
   const color = da > 30 ? "bg-green-100 text-green-700" : da > 20 ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"
   return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{da}</span>
@@ -21,27 +22,36 @@ export function ProspectRow({
   campaigns,
   onUpdated,
 }: {
-  prospect: any
+  prospect: Prospect
   campaigns: { id: string; name: string }[]
   onUpdated: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(prospect.title || "")
-  const [editNotes, setEditNotes] = useState(prospect.notes || "")
+  const [saving, setSaving] = useState(false)
 
-  const save = async (updates: Record<string, any>) => {
-    await fetch("/api/prospects", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: prospect.id, ...updates }),
-    })
-    onUpdated()
+  const save = async (updates: Record<string, unknown>) => {
+    setSaving(true)
+    try {
+      await fetch("/api/prospects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: prospect.id, ...updates }),
+      })
+      onUpdated()
+    } finally {
+      setSaving(false)
+    }
   }
 
   const remove = async () => {
-    if (confirm("Delete this prospect?")) {
+    if (!confirm("Delete this prospect?")) return
+    setSaving(true)
+    try {
       await fetch(`/api/prospects?id=${prospect.id}`, { method: "DELETE" })
       onUpdated()
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -63,7 +73,7 @@ export function ProspectRow({
             autoFocus
           />
         ) : (
-          <span onClick={() => setEditing(true)} className="cursor-pointer hover:text-brand-accent">
+          <span onClick={() => !saving && setEditing(true)} className="cursor-pointer hover:text-brand-accent">
             {prospect.title || "—"}
           </span>
         )}
@@ -77,7 +87,7 @@ export function ProspectRow({
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-1">
-          {(prospect.tags || []).map((t: string, i: number) => (
+          {(prospect.tags || []).map((t, i) => (
             <span key={i} className="inline-block rounded-full bg-brand-primary px-2 py-0.5 text-xs text-brand-secondary">{t}</span>
           ))}
         </div>
@@ -87,8 +97,10 @@ export function ProspectRow({
       </td>
       <td className="px-4 py-3">
         <div className="flex gap-2">
-          <button onClick={() => setEditing(!editing)} className="text-xs text-[#777777] hover:text-brand-secondary">Edit</button>
-          <button onClick={remove} className="text-xs text-brand-accent hover:text-red-700">Delete</button>
+          <button onClick={() => setEditing(!editing)} disabled={saving} className="text-xs text-[#777777] hover:text-brand-secondary">
+            {saving ? "..." : "Edit"}
+          </button>
+          <button onClick={remove} disabled={saving} className="text-xs text-brand-accent hover:text-red-700">Delete</button>
         </div>
       </td>
     </tr>

@@ -1,7 +1,8 @@
 "use client"
 import { signIn, signOut } from "next-auth/react"
+import type { Session } from "next-auth"
 
-export function SignInButton({ session }: { session: any }) {
+export function SignInButton({ session }: { session: Session | null }) {
   if (session) {
     return (
       <div className="flex items-center gap-3">

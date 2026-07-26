@@ -1,16 +1,18 @@
 "use client"
 import { useState } from "react"
 import { AddToCampaignDialog } from "./add-to-campaign-dialog"
+import type { ProspectSearchResult } from "@/types"
 
 export function ProspectTable({
   results,
   campaigns,
 }: {
-  results: any[]
+  results: ProspectSearchResult[]
   campaigns: { id: string; name: string }[]
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [showDialog, setShowDialog] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   const toggle = (i: number) => {
     const next = new Set(selected)
@@ -27,9 +29,10 @@ export function ProspectTable({
           </span>
           <button
             onClick={() => setShowDialog(true)}
+            disabled={adding}
             className="rounded-lg bg-brand-secondary px-4 py-1.5 text-sm font-medium text-brand-white"
           >
-            Add to Campaign
+            {adding ? "Adding..." : "Add to Campaign"}
           </button>
         </div>
       )}
@@ -59,19 +62,7 @@ export function ProspectTable({
                 <td className="px-4 py-3 font-medium">{r.domain}</td>
                 <td className="max-w-xs truncate px-4 py-3">{r.title}</td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                      r.domainAuthority != null
-                        ? r.domainAuthority > 30
-                          ? "bg-green-100 text-green-800"
-                          : r.domainAuthority > 20
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-600"
-                        : "bg-gray-100 text-gray-400"
-                    }`}
-                  >
-                    {r.domainAuthority ?? "—"}
-                  </span>
+                  <DABadge da={r.domainAuthority} />
                 </td>
                 <td className="max-w-xs truncate px-4 py-3 text-[#575858]">
                   {r.description || "—"}
@@ -87,18 +78,31 @@ export function ProspectTable({
           count={selected.size}
           campaigns={campaigns}
           onConfirm={async (campaignId) => {
-            const prospects = Array.from(selected).map((i) => results[i])
-            await fetch("/api/prospects/batch", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ campaignId, prospects }),
-            })
-            setSelected(new Set())
-            setShowDialog(false)
+            setAdding(true)
+            try {
+              const prospects = Array.from(selected).map((i) => results[i])
+              const res = await fetch("/api/prospects/batch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ campaignId, prospects }),
+              })
+              if (res.ok) {
+                setSelected(new Set())
+                setShowDialog(false)
+              }
+            } finally {
+              setAdding(false)
+            }
           }}
           onClose={() => setShowDialog(false)}
         />
       )}
     </div>
   )
+}
+
+function DABadge({ da }: { da: number | null }) {
+  if (da == null) return <span className="text-xs text-[#999999]">—</span>
+  const color = da > 30 ? "bg-green-100 text-green-700" : da > 20 ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"
+  return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{da}</span>
 }
