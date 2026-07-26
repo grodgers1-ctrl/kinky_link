@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import { DndContext, DragEndEvent } from "@dnd-kit/core"
 import { PipelineColumn } from "./pipeline-column"
+import { useToast } from "@/components/ui/toast"
 
 const COLUMNS = [
   { id: "prospect", label: "Prospects", color: "bg-gray-50" },
@@ -13,6 +14,7 @@ const COLUMNS = [
 export function PipelineBoard() {
   const [prospects, setProspects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { addToast } = useToast()
 
   const fetchProspects = async () => {
     const res = await fetch("/api/prospects")
@@ -32,11 +34,14 @@ export function PipelineBoard() {
       prev.map((p) => (p.id === active.id ? { ...p, status: newStatus } : p))
     )
 
-    await fetch("/api/prospects", {
+    const res = await fetch("/api/prospects", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: active.id, status: newStatus }),
     })
+
+    if (res.ok) addToast(`Moved to ${newStatus}`)
+    else addToast("Failed to move prospect", "error")
   }
 
   if (loading) {

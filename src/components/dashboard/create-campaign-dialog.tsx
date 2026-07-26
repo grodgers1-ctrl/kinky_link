@@ -1,9 +1,11 @@
 "use client"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/toast"
 
 export function CreateCampaignDialog({ sites }: { sites: { id: string; url: string }[] }) {
   const router = useRouter()
+  const { addToast } = useToast()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [siteId, setSiteId] = useState("")
@@ -19,11 +21,16 @@ export function CreateCampaignDialog({ sites }: { sites: { id: string; url: stri
         body: JSON.stringify({ name: name.trim(), siteId: siteId || undefined }),
       })
       if (res.ok) {
+        addToast(`Campaign '${name.trim()}' created`)
         setOpen(false)
         setName("")
         setSiteId("")
         router.refresh()
+      } else {
+        addToast("Failed to create campaign", "error")
       }
+    } catch {
+      addToast("Failed to create campaign", "error")
     } finally {
       setLoading(false)
     }
