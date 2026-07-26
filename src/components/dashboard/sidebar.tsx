@@ -10,6 +10,7 @@ const navItems = [
   { href: "/dashboard/prospects", label: "Prospects", icon: "Users" },
   { href: "/dashboard/pipeline", label: "Pipeline", icon: "Kanban" },
   { href: "/dashboard/templates", label: "Templates", icon: "FileText" },
+  { href: "/dashboard/sequences", label: "Sequences", icon: "Timer" },
   { href: "/dashboard/backlinks", label: "Backlinks", icon: "Link" },
   { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
 ]

@@ -1,0 +1,8 @@
+{
+  "cron": [
+    {
+      "path": "/api/cron/send-followups",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
