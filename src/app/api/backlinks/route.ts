@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     const siteId = searchParams.get("siteId")
     const healthStatus = searchParams.get("healthStatus")
     const search = searchParams.get("search")
+    const indexFilter = searchParams.get("indexFilter")
 
     let query = supabaseAdmin
       .from("backlinks")
@@ -24,6 +25,9 @@ export async function GET(req: NextRequest) {
     if (siteId) query = query.eq("site_id", siteId)
     if (healthStatus) query = query.eq("health_status", healthStatus)
     if (search) query = query.ilike("source_url", `%${search}%`)
+    if (indexFilter === "indexed") query = query.eq("is_indexed", true)
+    else if (indexFilter === "not_indexed") query = query.eq("is_indexed", false)
+    else if (indexFilter === "unknown") query = query.is("is_indexed", null)
 
     const { data, error } = await query
     if (error) {

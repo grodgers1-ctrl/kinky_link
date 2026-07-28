@@ -10,12 +10,14 @@ export function BacklinksView({ sites }: { sites: { id: string; url: string }[] 
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [checkingAll, setCheckingAll] = useState(false)
+  const [indexFilter, setIndexFilter] = useState("")
 
   const fetchBacklinks = async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (selectedSite) params.set("siteId", selectedSite)
     if (search) params.set("search", search)
+    if (indexFilter) params.set("indexFilter", indexFilter)
 
     const res = await fetch(`/api/backlinks?${params}`)
     const data = await res.json()
@@ -24,7 +26,7 @@ export function BacklinksView({ sites }: { sites: { id: string; url: string }[] 
     setLoading(false)
   }
 
-  useEffect(() => { fetchBacklinks() }, [selectedSite])
+  useEffect(() => { fetchBacklinks() }, [selectedSite, indexFilter])
 
   const checkAllHealth = async () => {
     setCheckingAll(true)
@@ -53,6 +55,16 @@ export function BacklinksView({ sites }: { sites: { id: string; url: string }[] 
           {sites.map(site => (
             <option key={site.id} value={site.id}>{site.url}</option>
           ))}
+        </select>
+        <select
+          value={indexFilter}
+          onChange={e => setIndexFilter(e.target.value)}
+          className="rounded-lg border border-[#CCCCCD] px-3 py-2 text-sm text-[#575858]"
+        >
+          <option value="">All Index Status</option>
+          <option value="indexed">Indexed</option>
+          <option value="not_indexed">Not Indexed</option>
+          <option value="unknown">Unknown</option>
         </select>
         <input
           placeholder="Search source URL..."

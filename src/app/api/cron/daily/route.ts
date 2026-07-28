@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/db"
 import { sendGmailEmail, injectTrackedLinks, injectTrackingPixel } from "@/lib/email"
 import { syncBacklinksToDb } from "@/lib/gsc-backlinks"
 import { checkSingleUrl, determineHealth } from "@/lib/health-checker"
+import { checkUrlIndexedSimple } from "@/lib/index-checker"
 import crypto from "crypto"
 
 export const dynamic = "force-dynamic"
@@ -208,6 +209,46 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("Health check cron error:", err)
     results.healthCheck = { error: "Failed" }
+  }
+
+  // --- PART 4: INDEX CHECK PENDING BACKLINKS ---
+  try {
+    const { data: unindexedLinks } = await supabaseAdmin
+      .from("backlinks")
+      .select("id, source_url")
+      .is("is_indexed", null)
+      .limit(100)
+
+    if (unindexedLinks && unindexedLinks.length > 0) {
+      let indexed = 0
+      let notIndexed = 0
+      let unknown = 0
+
+      for (const bl of unindexedLinks) {
+        try {
+          const result = await checkUrlIndexedSimple(bl.source_url)
+          const isIndexed = result === "indexed" ? true : result === "not_indexed" ? false : null
+
+          await supabaseAdmin
+            .from("backlinks")
+            .update({ is_indexed: isIndexed, updated_at: new Date().toISOString() })
+            .eq("id", bl.id)
+
+          if (result === "indexed") indexed++
+          else if (result === "not_indexed") notIndexed++
+          else unknown++
+        } catch {
+          // individual failure shouldn't block the batch
+        }
+      }
+
+      results.indexCheck = { checked: unindexedLinks.length, indexed, notIndexed, unknown }
+    } else {
+      results.indexCheck = { checked: 0 }
+    }
+  } catch (err) {
+    console.error("Index check cron error:", err)
+    results.indexCheck = { error: "Failed" }
   }
 
   return NextResponse.json(results)
