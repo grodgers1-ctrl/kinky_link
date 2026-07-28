@@ -19,10 +19,15 @@ export function BacklinksView({ sites }: { sites: { id: string; url: string }[] 
     if (search) params.set("search", search)
     if (indexFilter) params.set("indexFilter", indexFilter)
 
-    const res = await fetch(`/api/backlinks?${params}`)
-    const data = await res.json()
-    setBacklinks(data.backlinks || [])
-    setSummary(data.summary || null)
+    try {
+      const res = await fetch(`/api/backlinks?${params}`)
+      const data = await res.json()
+      setBacklinks(data.backlinks || [])
+      setSummary(data.summary || null)
+    } catch {
+      setBacklinks([])
+      setSummary(null)
+    }
     setLoading(false)
   }
 

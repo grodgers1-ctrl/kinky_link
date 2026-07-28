@@ -39,3 +39,29 @@ Lessons extracted from `code-review-week1.md` and applied in commit `61256be`.
 - **Every fetch needs loading, empty, AND error states.** The pipeline board, GSC summary, and connect-site card all had silent error states.
 - **Inline edits need loading indicators.** Disable the edit/delete button while the PATCH/DELETE is in flight.
 - **Pipeline drag should optimistically update but roll back on API failure.**
+
+---
+
+## Week 2 Additions
+
+### Security
+- **Tracking endpoints must set `user_id`** by looking up the sent event via `message_id`. Without this, open/click events are orphaned and user-scoped analytics is broken.
+- **Cron endpoints need authentication.** Protect them with an `Authorization: Bearer ${CRON_SECRET}` header check.
+- **Pub/Sub webhooks need request verification.** At minimum check an `X-Goog-Signature` or shared secret.
+- **Store OAuth tokens with refresh logic.** Webhook handlers that reuse `access_token` from the DB must handle token expiry by exchanging the `refresh_token`.
+
+### React
+- **Never use `useState(() => { sideEffect() })`.** The initializer function runs during render, not as an effect. Use `useEffect` for data fetching.
+- **`Promise.all` for parallel fetches** in effects reduces waterfall timing.
+
+### Database
+- **All foreign keys should be explicit.** `sequence_id` in `email_events` was missing `REFERENCES sequences(id)`, meaning no referential integrity.
+- **Partial indexes must match query filters.** The `idx_seq_progress_next_send` index only covers `in_progress` status, but the cron query also filters `pending` rows, bypassing the index.
+
+### Email / MIME
+- **`Content-Transfer-Encoding: quoted-printable` requires the body to be QP-encoded.** Either encode it or drop the header for raw HTML.
+- **Tracking pixel fallback:** if `</body>` isn't present, append the pixel to the end of the HTML rather than silently failing.
+- **Merge tags should HTML-escape values** when rendering the HTML email body variant.
+
+### Brand
+- **Status badges and skeletons must use brand tokens.** `bg-brand-surface` instead of `bg-gray-100`, `bg-brand-accent` instead of `bg-red-600`.

@@ -16,9 +16,13 @@ export function BacklinkDetail({ backlink }: { backlink: any }) {
     setHealthLoading(true)
     try {
       const res = await fetch(`/api/backlinks/${backlink.id}/check-health`, { method: "POST" })
-      const data = await res.json()
-      setHealthStatus(data.healthStatus)
-      setHealthResult(data)
+      if (res.ok) {
+        const data = await res.json()
+        setHealthStatus(data.healthStatus)
+        setHealthResult(data)
+      }
+    } catch {
+      // errors handled silently — loading state resets below
     } finally {
       setHealthLoading(false)
     }
@@ -28,8 +32,12 @@ export function BacklinkDetail({ backlink }: { backlink: any }) {
     setIndexLoading(true)
     try {
       const res = await fetch(`/api/backlinks/${backlink.id}/check-index`, { method: "POST" })
-      const data = await res.json()
-      setIndexed(data.indexed)
+      if (res.ok) {
+        const data = await res.json()
+        setIndexed(data.indexed)
+      }
+    } catch {
+      // errors handled silently — loading state resets below
     } finally {
       setIndexLoading(false)
     }

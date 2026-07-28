@@ -14,6 +14,17 @@ export async function GET(
   const { id } = await params
 
   try {
+    const { data: backlink } = await supabaseAdmin
+      .from("backlinks")
+      .select("id")
+      .eq("id", id)
+      .eq("user_id", session.user.id)
+      .single()
+
+    if (!backlink) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
     const { data } = await supabaseAdmin
       .from("backlink_history")
       .select("*")

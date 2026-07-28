@@ -20,8 +20,12 @@ export function SavedKeywords() {
   useEffect(() => { fetchSaved() }, [])
 
   const remove = async (id: string) => {
-    await fetch(`/api/keywords?id=${id}`, { method: "DELETE" })
-    fetchSaved()
+    try {
+      const res = await fetch(`/api/keywords?id=${id}`, { method: "DELETE" })
+      if (res.ok) fetchSaved()
+    } catch {
+      // errors handled silently
+    }
   }
 
   if (loading) {

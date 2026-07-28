@@ -47,7 +47,7 @@ export async function POST(
         title: "Broken backlink detected",
         body: `${backlink.source_url} is returning ${status.statusCode}`,
         link: `/dashboard/backlinks/${id}`,
-      }).maybeSingle()
+      })
     }
 
     return NextResponse.json({ healthStatus, sourceCheck: status, targetCheck: targetStatus })

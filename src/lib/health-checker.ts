@@ -107,7 +107,7 @@ export async function batchCheckAllBacklinks(userId?: string) {
         title: "Broken backlink detected",
         body: `${bl.source_url} is broken`,
         link: `/dashboard/backlinks/${bl.id}`,
-      }).maybeSingle()
+      })
     } else if (healthStatus === "healthy") {
       healthyCount++
     }

@@ -1,6 +1,5 @@
 "use client"
 import { useEffect, useState } from "react"
-import Link from "next/link"
 
 export function BacklinksWidget() {
   const [summary, setSummary] = useState<any>(null)

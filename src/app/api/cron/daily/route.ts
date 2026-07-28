@@ -12,7 +12,7 @@ const BASE_URL = process.env.AUTH_URL || "http://localhost:3000"
 const CRON_SECRET = process.env.CRON_SECRET
 
 export async function GET(req: NextRequest) {
-  if (CRON_SECRET && req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
             .eq("sequence_id", item.sequence_id)
             .order("step_order", { ascending: true })
 
-          const step = (steps || []).find((s: any) => s.step_order === item.current_step)
+          const step = (steps || []).find(s => s.step_order === item.current_step)
           if (!step) {
             await supabaseAdmin.from("sequence_progress")
               .update({ status: "completed", updated_at: new Date().toISOString() })
@@ -48,10 +48,13 @@ export async function GET(req: NextRequest) {
             continue
           }
 
+          if (!item.prospect.email) { errors++; continue }
+
           const { data: account } = await supabaseAdmin
             .from("accounts")
             .select("access_token, refresh_token")
             .eq("user_id", item.sequence.user_id)
+            .eq("provider", "google")
             .single()
 
           if (!account) { errors++; continue }
@@ -63,7 +66,7 @@ export async function GET(req: NextRequest) {
           )
 
           const result = await sendGmailEmail({
-            to: item.prospect.email || item.prospect.url,
+            to: item.prospect.email,
             subject: step.subject,
             bodyHtml: renderedHtml,
             bodyText: step.body_text,
@@ -86,7 +89,7 @@ export async function GET(req: NextRequest) {
           })
 
           const nextStepOrder = item.current_step + 1
-          const nextStep = (steps || []).find((s: any) => s.step_order === nextStepOrder)
+          const nextStep = (steps || []).find(s => s.step_order === nextStepOrder)
           const nextSendAt = nextStep
             ? new Date(Date.now() + nextStep.delay_days * 86400000).toISOString()
             : null
@@ -125,6 +128,7 @@ export async function GET(req: NextRequest) {
     const { data: accounts } = await supabaseAdmin
       .from("accounts")
       .select("user_id, access_token")
+      .eq("provider", "google")
       .not("access_token", "is", null)
 
     let totalNew = 0
@@ -193,7 +197,7 @@ export async function GET(req: NextRequest) {
               title: "Broken backlink detected",
               body: `${bl.source_url} is broken`,
               link: `/dashboard/backlinks/${bl.id}`,
-            }).maybeSingle()
+            })
           } else if (healthStatus === "healthy") {
             healthy++
           }

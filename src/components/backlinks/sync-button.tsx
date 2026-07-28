@@ -7,11 +7,12 @@ export function SyncButton() {
   const handleSync = async () => {
     setSyncing(true)
     try {
-      await fetch("/api/backlinks/sync", { method: "POST" })
-      window.location.reload()
+      const res = await fetch("/api/backlinks/sync", { method: "POST" })
+      if (res.ok) window.location.reload()
     } catch {
-      setSyncing(false)
+      // errors handled silently
     }
+    setSyncing(false)
   }
 
   return (
