@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { AiDraftButton } from "@/components/ai/ai-draft-button"
 
 const MERGE_TAGS = [
   { tag: "{{first_name}}", label: "First Name" },
@@ -53,6 +54,16 @@ export function TemplateEditor({
         onChange={(e) => setSubject(e.target.value)}
         className="w-full rounded-lg border border-[#CCCCCD] bg-brand-white px-3 py-2 text-sm text-brand-secondary placeholder:text-[#999999]"
       />
+
+      <div className="flex items-center gap-2">
+        <AiDraftButton
+          onDraftGenerated={(draft) => {
+            setSubject(draft.subject)
+            setBodyHtml(draft.bodyHtml)
+            setBodyText(draft.bodyText)
+          }}
+        />
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {MERGE_TAGS.map((t) => (
