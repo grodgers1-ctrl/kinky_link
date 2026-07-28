@@ -9,6 +9,7 @@ export function BacklinksView({ sites }: { sites: { id: string; url: string }[] 
   const [selectedSite, setSelectedSite] = useState<string>("")
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
+  const [checkingAll, setCheckingAll] = useState(false)
 
   const fetchBacklinks = async () => {
     setLoading(true)
@@ -24,6 +25,19 @@ export function BacklinksView({ sites }: { sites: { id: string; url: string }[] 
   }
 
   useEffect(() => { fetchBacklinks() }, [selectedSite])
+
+  const checkAllHealth = async () => {
+    setCheckingAll(true)
+    for (const bl of backlinks) {
+      try {
+        await fetch(`/api/backlinks/${bl.id}/check-health`, { method: "POST" })
+      } catch {
+        // continue despite individual failures
+      }
+    }
+    setCheckingAll(false)
+    fetchBacklinks()
+  }
 
   return (
     <div className="space-y-6">
@@ -48,6 +62,19 @@ export function BacklinksView({ sites }: { sites: { id: string; url: string }[] 
           className="flex-1 rounded-lg border border-[#CCCCCD] px-3 py-2 text-sm placeholder-[#999999]"
         />
       </div>
+
+      {backlinks.length > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-[#DCDDDE] bg-brand-surface p-3">
+          <span className="text-sm text-[#575858]">Bulk actions:</span>
+          <button
+            onClick={checkAllHealth}
+            disabled={checkingAll}
+            className="rounded border border-[#DCDDDE] bg-white px-3 py-1 text-sm hover:bg-brand-surface disabled:opacity-50"
+          >
+            {checkingAll ? "Checking..." : "Check Health (All)"}
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-2">

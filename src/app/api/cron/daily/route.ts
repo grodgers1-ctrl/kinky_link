@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/db"
 import { sendGmailEmail, injectTrackedLinks, injectTrackingPixel } from "@/lib/email"
 import { syncBacklinksToDb } from "@/lib/gsc-backlinks"
+import { checkSingleUrl, determineHealth } from "@/lib/health-checker"
 import crypto from "crypto"
 
 export const dynamic = "force-dynamic"
@@ -152,6 +153,61 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("Backlink sync cron error:", err)
     results.backlinks = { error: "Failed" }
+  }
+
+  // --- PART 3: HEALTH CHECK STALE BACKLINKS ---
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+
+    const { data: staleBacklinks } = await supabaseAdmin
+      .from("backlinks")
+      .select("id, source_url, user_id")
+      .or(`last_health_check.is.null,last_health_check.lte.${sevenDaysAgo}`)
+      .limit(200)
+
+    if (staleBacklinks && staleBacklinks.length > 0) {
+      let broken = 0
+      let healthy = 0
+
+      for (const bl of staleBacklinks) {
+        try {
+          const result = await checkSingleUrl(bl.source_url)
+          const healthStatus = determineHealth(result)
+
+          await supabaseAdmin
+            .from("backlinks")
+            .update({ health_status: healthStatus, last_health_check: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq("id", bl.id)
+
+          await supabaseAdmin.from("backlink_history").insert({
+            backlink_id: bl.id,
+            health_status: healthStatus,
+          })
+
+          if (healthStatus === "broken") {
+            broken++
+            await supabaseAdmin.from("notifications").insert({
+              user_id: bl.user_id,
+              type: "info",
+              title: "Broken backlink detected",
+              body: `${bl.source_url} is broken`,
+              link: `/dashboard/backlinks/${bl.id}`,
+            }).maybeSingle()
+          } else if (healthStatus === "healthy") {
+            healthy++
+          }
+        } catch {
+          // individual failure shouldn't block the batch
+        }
+      }
+
+      results.healthCheck = { checked: staleBacklinks.length, broken, healthy }
+    } else {
+      results.healthCheck = { checked: 0 }
+    }
+  } catch (err) {
+    console.error("Health check cron error:", err)
+    results.healthCheck = { error: "Failed" }
   }
 
   return NextResponse.json(results)
