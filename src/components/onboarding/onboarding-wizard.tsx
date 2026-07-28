@@ -1,6 +1,7 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { signIn } from "next-auth/react"
 
 const STEPS = [
   { id: "welcome", label: "Welcome" },
@@ -15,39 +16,52 @@ export function OnboardingWizard() {
   const [step, setStep] = useState(0)
   const [campaignName, setCampaignName] = useState("")
   const [keyword, setKeyword] = useState("")
-  const [sites, setSites] = useState<{ id: string; url: string }[]>([])
-  const [selectedSite, setSelectedSite] = useState("")
+  const [sites, setSites] = useState<{ url: string }[]>([])
+  const [selectedSiteUrl, setSelectedSiteUrl] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
   const [prospectCount, setProspectCount] = useState(0)
   const router = useRouter()
 
-  useEffect(() => {
-    if (step === 2) {
-      fetch("/api/sites")
-        .then(r => r.json())
-        .then(d => {
-          const list = (d.sites || []).map((s: any, i: number) => ({ id: `site_${i}`, url: s.siteUrl || s.url }))
-          setSites(list)
-          if (list.length > 0) setSelectedSite(list[0].url)
-        })
-        .catch(() => {})
+  const fetchSites = useCallback(async () => {
+    try {
+      const res = await fetch("/api/sites")
+      const data = await res.json()
+      const list = (data.sites || []).map((s: any) => ({ url: s.siteUrl || s.url }))
+      setSites(list)
+      if (list.length > 0) setSelectedSiteUrl(list[0].url)
+    } catch {
+      setError("Failed to load sites")
     }
-  }, [step])
+  }, [])
 
-  const nextStep = () => setStep(s => Math.min(s + 1, STEPS.length - 1))
-  const prevStep = () => setStep(s => Math.max(s - 1, 0))
+  useEffect(() => {
+    if (step === 2) fetchSites()
+  }, [step, fetchSites])
+
+  const nextStep = () => { setStep(s => Math.min(s + 1, STEPS.length - 1)); setError("") }
+  const prevStep = () => { setStep(s => Math.max(s - 1, 0)); setError("") }
 
   const createCampaign = async () => {
     if (!campaignName.trim()) return
     setLoading(true)
+    setError("")
     try {
-      await fetch("/api/campaigns", {
+      const res = await fetch("/api/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: campaignName }),
+        body: JSON.stringify({ name: campaignName, siteId: selectedSiteUrl || undefined }),
       })
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || "Failed to create campaign")
+        setLoading(false)
+        return
+      }
     } catch {
-      // silently handle
+      setError("Network error. Please try again.")
+      setLoading(false)
+      return
     }
     setLoading(false)
     nextStep()
@@ -56,12 +70,21 @@ export function OnboardingWizard() {
   const findProspects = async () => {
     if (!keyword.trim()) return
     setLoading(true)
+    setError("")
     try {
       const res = await fetch(`/api/prospects/search?keyword=${encodeURIComponent(keyword)}`)
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || "Search failed")
+        setLoading(false)
+        return
+      }
       const data = await res.json()
-      setProspectCount(data.prospects?.length || 0)
+      setProspectCount(data.results?.length || 0)
     } catch {
-      // silently handle
+      setError("Network error. Please try again.")
+      setLoading(false)
+      return
     }
     setLoading(false)
     nextStep()
@@ -69,7 +92,6 @@ export function OnboardingWizard() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-4 py-12">
-      {/* Progress bar */}
       <div className="flex items-center justify-center gap-2">
         {STEPS.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2">
@@ -88,8 +110,13 @@ export function OnboardingWizard() {
         ))}
       </div>
 
-      {/* Step content */}
       <div className="mt-16">
+        {error && (
+          <div className="mb-4 rounded-lg border border-brand-accent bg-[#FFF0F2] p-3 text-sm text-brand-accent">
+            {error}
+          </div>
+        )}
+
         {step === 0 && (
           <div className="text-center">
             <h2 className="text-h2 font-bold text-brand-secondary">Welcome to kinkylink!</h2>
@@ -112,7 +139,7 @@ export function OnboardingWizard() {
               We only send emails you explicitly schedule. We never access your other emails.
             </p>
             <button
-              onClick={() => { window.location.href = "/api/auth/signin/google" }}
+              onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
               className="mt-8 flex items-center gap-2 rounded-lg border border-[#DCDDDE] bg-white px-8 py-3 hover:bg-brand-surface mx-auto"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -139,7 +166,7 @@ export function OnboardingWizard() {
               <div className="mt-8 rounded-lg border border-dashed border-[#DCDDDE] p-8">
                 <p className="text-sm text-[#575858]">No sites found in Google Search Console.</p>
                 <button
-                  onClick={() => { window.location.href = "/api/auth/signin/google" }}
+                  onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
                   className="mt-4 text-sm text-brand-accent hover:underline"
                 >
                   Reconnect with the correct Google account
@@ -147,16 +174,16 @@ export function OnboardingWizard() {
               </div>
             ) : (
               <div className="mt-8 space-y-3">
-                {sites.map(site => (
-                  <label key={site.id} className={`flex items-center gap-3 rounded-lg border p-4 cursor-pointer transition-colors ${
-                    selectedSite === site.url ? "border-brand-accent bg-brand-primary" : "border-[#DCDDDE] hover:bg-brand-surface"
+                {sites.map((site, i) => (
+                  <label key={i} className={`flex items-center gap-3 rounded-lg border p-4 cursor-pointer transition-colors ${
+                    selectedSiteUrl === site.url ? "border-brand-accent bg-brand-primary" : "border-[#DCDDDE] hover:bg-brand-surface"
                   }`}>
                     <input
                       type="radio"
                       name="site"
                       value={site.url}
-                      checked={selectedSite === site.url}
-                      onChange={e => setSelectedSite(e.target.value)}
+                      checked={selectedSiteUrl === site.url}
+                      onChange={e => setSelectedSiteUrl(e.target.value)}
                       className="accent-brand-accent"
                     />
                     <span className="text-sm text-brand-secondary">{site.url}</span>

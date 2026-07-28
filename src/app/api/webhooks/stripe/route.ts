@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
             stripe_customer_id: eventData.customer,
             subscription_status: sub.status,
             subscription_plan: sub.items?.data?.[0]?.price?.recurring?.interval || "monthly",
-            subscription_current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-            trial_end: new Date(sub.trial_end * 1000).toISOString(),
+            subscription_current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+            trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
           })
           .eq("id", userId)
         break
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
           .from("users")
           .update({
             subscription_status: eventData.status,
-            subscription_current_period_end: new Date(eventData.current_period_end * 1000).toISOString(),
+            subscription_current_period_end: eventData.current_period_end ? new Date(eventData.current_period_end * 1000).toISOString() : null,
           })
           .eq("stripe_customer_id", eventData.customer)
         break

@@ -8,7 +8,7 @@ CREATE TABLE users (
   avatar_url TEXT,
   stripe_customer_id TEXT,
   subscription_status TEXT DEFAULT 'trialing' CHECK (subscription_status IN ('active', 'trialing', 'canceled', 'past_due', 'incomplete')),
-  subscription_plan TEXT DEFAULT 'monthly' CHECK (subscription_plan IN ('monthly', 'yearly', 'none')),
+  subscription_plan TEXT DEFAULT 'none' CHECK (subscription_plan IN ('monthly', 'yearly', 'none')),
   trial_end TIMESTAMPTZ DEFAULT NOW() + INTERVAL '7 days',
   subscription_current_period_end TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),

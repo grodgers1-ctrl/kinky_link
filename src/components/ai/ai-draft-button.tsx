@@ -63,14 +63,14 @@ export function AiDraftButton({ onDraftGenerated, templateType }: AiDraftButtonP
       <button
         onClick={() => setOpen(true)}
         disabled={remaining === 0}
-        className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+        className="rounded-lg border border-[#DCDDDE] bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-secondary hover:opacity-80 disabled:opacity-50"
       >
         AI Draft ({remaining} left)
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+          <div className="w-full max-w-lg rounded-lg bg-brand-white p-6 shadow-xl">
             <h3 className="text-lg font-medium text-brand-secondary">AI Email Draft</h3>
 
             <div className="mt-4 space-y-3">

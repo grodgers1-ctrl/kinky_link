@@ -1,21 +1,30 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export function BillingSettings({ subscription }: { subscription: any }) {
   const [loading, setLoading] = useState(false)
+  const [daysLeft, setDaysLeft] = useState(0)
+
+  useEffect(() => {
+    if (subscription?.trial_end) {
+      const remaining = Math.max(0, Math.ceil((new Date(subscription.trial_end).getTime() - Date.now()) / 86400000))
+      setDaysLeft(remaining)
+    }
+  }, [subscription?.trial_end])
 
   const handleManage = async () => {
     setLoading(true)
-    const res = await fetch("/api/billing/portal")
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
+    try {
+      const res = await fetch("/api/billing/portal")
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch {
+      // silently handle
+    }
     setLoading(false)
   }
 
   const isActive = subscription?.subscription_status === "active" || subscription?.subscription_status === "trialing"
-  const daysLeft = subscription?.trial_end
-    ? Math.max(0, Math.ceil((new Date(subscription.trial_end).getTime() - Date.now()) / 86400000))
-    : 0
 
   return (
     <div className="rounded-lg border border-[#DCDDDE] bg-white p-6">
