@@ -15,9 +15,13 @@ export function CampaignEmailActions({ campaignId }: { campaignId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaignId }),
       })
-      const data = await res.json()
-      const found = data.results?.filter((r: any) => r.email).length || 0
-      setResult(`Found ${found} email(s)`)
+      if (res.ok) {
+        const data = await res.json()
+        const found = data.results?.filter((r: any) => r.email).length || 0
+        setResult(`Found ${found} email(s)`)
+      } else {
+        setResult("Find failed")
+      }
     } catch {
       setResult("Failed to find emails")
     }
@@ -29,6 +33,7 @@ export function CampaignEmailActions({ campaignId }: { campaignId: string }) {
     setResult(null)
     try {
       const res = await fetch(`/api/prospects?campaignId=${campaignId}`)
+      if (!res.ok) { setResult("Failed to load prospects"); setVerifying(false); return }
       const { prospects } = await res.json()
       const ids = (prospects || []).filter((p: any) => p.email).map((p: any) => p.id)
       if (ids.length === 0) {
@@ -41,8 +46,12 @@ export function CampaignEmailActions({ campaignId }: { campaignId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prospectIds: ids }),
       })
-      const vdata = await vres.json()
-      setResult(`Verified ${vdata.verified}/${vdata.total} emails`)
+      if (vres.ok) {
+        const vdata = await vres.json()
+        setResult(`Verified ${vdata.verified}/${vdata.total} emails`)
+      } else {
+        setResult("Verification failed")
+      }
     } catch {
       setResult("Failed to verify emails")
     }

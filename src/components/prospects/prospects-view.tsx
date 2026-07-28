@@ -129,13 +129,13 @@ export function ProspectsView({
               setFindingAll(true)
               const ids = prospects.filter(p => !p.email).map(p => p.id)
               if (ids.length === 0) { setFindingAll(false); return }
-              await fetch("/api/prospects/find-email", {
+              const res = await fetch("/api/prospects/find-email", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ prospectIds: ids }),
               })
               setFindingAll(false)
-              fetchProspects()
+              if (res.ok) fetchProspects()
             }}
             disabled={findingAll}
             className="rounded border border-[#DCDDDE] bg-white px-3 py-1 text-sm hover:bg-brand-surface disabled:opacity-50"

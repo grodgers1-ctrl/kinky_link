@@ -73,10 +73,10 @@ export default async function DashboardPage() {
         </div>
       ))}
 
-      <div className="rounded-lg border border-[#DCDDDE] bg-white p-6">
+      <div className="rounded-lg border border-[#DCDDDE] bg-brand-white p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium text-brand-secondary">Backlinks</h2>
-          <Link href="/dashboard/backlinks" className="text-sm text-blue-600 hover:underline">View all</Link>
+          <Link href="/dashboard/backlinks" className="text-sm text-brand-accent hover:underline">View all</Link>
         </div>
         <BacklinksWidget />
       </div>
