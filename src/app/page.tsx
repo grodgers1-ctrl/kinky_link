@@ -33,6 +33,11 @@ export default async function Home() {
         <p className="text-center text-caption text-[#999999]">
           Sign in with Google to get started
         </p>
+        <div className="text-center">
+          <a href="/pricing" className="text-sm text-brand-accent hover:underline">
+            View pricing
+          </a>
+        </div>
       </div>
     </div>
   )
