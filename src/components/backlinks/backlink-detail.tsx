@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { HealthBadge } from "./health-badge"
 import { HealthTimeline } from "./health-timeline"
+import { DestinationHealthCheck } from "./destination-health-check"
 
 export function BacklinkDetail({ backlink }: { backlink: any }) {
   const [healthStatus, setHealthStatus] = useState(backlink.health_status)
@@ -66,6 +67,13 @@ export function BacklinkDetail({ backlink }: { backlink: any }) {
         </div>
 
         <div className="rounded-lg border border-[#DCDDDE] bg-white p-4">
+          <h3 className="text-sm font-medium text-[#777777]">Destination URL Health</h3>
+          <DestinationHealthCheck targetUrl={backlink.target_url} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="rounded-lg border border-[#DCDDDE] bg-white p-4">
           <h3 className="text-sm font-medium text-[#777777]">Index Status</h3>
           <div className="mt-2">
             {indexed === true ? (
@@ -84,32 +92,28 @@ export function BacklinkDetail({ backlink }: { backlink: any }) {
             {indexLoading ? "Checking..." : "Check Index Status"}
           </button>
         </div>
-      </div>
 
-      <div className="rounded-lg border border-[#DCDDDE] bg-white p-4">
-        <h3 className="text-sm font-medium text-[#777777]">Details</h3>
-        <dl className="mt-3 grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <dt className="text-[#999999]">Target URL</dt>
-            <dd className="mt-1 truncate text-[#575858]">{backlink.target_url}</dd>
-          </div>
-          <div>
-            <dt className="text-[#999999]">Site</dt>
-            <dd className="mt-1 text-[#575858]">{backlink.sites?.url || "\u2014"}</dd>
-          </div>
-          <div>
-            <dt className="text-[#999999]">Anchor Text</dt>
-            <dd className="mt-1 text-[#575858]">{backlink.anchor_text || "\u2014"}</dd>
-          </div>
-          <div>
-            <dt className="text-[#999999]">First Seen</dt>
-            <dd className="mt-1 text-[#575858]">{backlink.first_seen || "\u2014"}</dd>
-          </div>
-          <div>
-            <dt className="text-[#999999]">Last Seen</dt>
-            <dd className="mt-1 text-[#575858]">{backlink.last_seen || "\u2014"}</dd>
-          </div>
-        </dl>
+        <div className="rounded-lg border border-[#DCDDDE] bg-white p-4">
+          <h3 className="text-sm font-medium text-[#777777]">Details</h3>
+          <dl className="mt-3 space-y-3 text-sm">
+            <div>
+              <dt className="text-[#999999]">Site</dt>
+              <dd className="mt-1 text-[#575858]">{backlink.sites?.url || "\u2014"}</dd>
+            </div>
+            <div>
+              <dt className="text-[#999999]">Anchor Text</dt>
+              <dd className="mt-1 text-[#575858]">{backlink.anchor_text || "\u2014"}</dd>
+            </div>
+            <div>
+              <dt className="text-[#999999]">First Seen</dt>
+              <dd className="mt-1 text-[#575858]">{backlink.first_seen || "\u2014"}</dd>
+            </div>
+            <div>
+              <dt className="text-[#999999]">Last Seen</dt>
+              <dd className="mt-1 text-[#575858]">{backlink.last_seen || "\u2014"}</dd>
+            </div>
+          </dl>
+        </div>
       </div>
 
       <HealthTimeline backlinkId={backlink.id} />
