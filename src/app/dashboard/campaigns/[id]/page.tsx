@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/db"
 import { redirect } from "next/navigation"
 import { CampaignEmailStats } from "@/components/campaigns/campaign-email-stats"
+import { CampaignEmailActions } from "@/components/campaigns/campaign-email-actions"
 
 export default async function CampaignDetailPage({
   params,
@@ -34,6 +35,11 @@ export default async function CampaignDetailPage({
         <p className="mt-1 text-sm text-[#575858]">
           {campaign.sites?.url || "No site"} &middot; {campaign.status}
         </p>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-h3 font-bold text-brand-secondary">Email Finder</h2>
+        <CampaignEmailActions campaignId={id} />
       </div>
 
       <section>
