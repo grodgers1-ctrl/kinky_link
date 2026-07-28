@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 import { ConnectSitePrompt } from "@/components/dashboard/connect-site-card"
 import { GscSummary } from "@/components/dashboard/gsc-summary"
 import { EmailStats } from "@/components/dashboard/email-stats"
+import { BacklinksWidget } from "@/components/dashboard/backlinks-widget"
+import Link from "next/link"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -38,6 +40,14 @@ export default async function DashboardPage() {
           <GscSummary siteId={site.id} />
         </div>
       ))}
+
+      <div className="rounded-lg border border-[#DCDDDE] bg-white p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium text-brand-secondary">Backlinks</h2>
+          <Link href="/dashboard/backlinks" className="text-sm text-blue-600 hover:underline">View all</Link>
+        </div>
+        <BacklinksWidget />
+      </div>
 
       <section>
         <h2 className="text-h3 font-bold text-brand-secondary">Email Performance</h2>
