@@ -16,6 +16,11 @@ export default async function DashboardPage() {
     .select("*")
     .eq("user_id", session.user.id)
 
+  const { count: campaignCount } = await supabase
+    .from("campaigns")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", session.user.id)
+
   if (!sites || sites.length === 0) {
     return (
       <div>
@@ -26,6 +31,33 @@ export default async function DashboardPage() {
           Connect your site to get started finding prospects and building links.
         </p>
         <ConnectSitePrompt />
+        <div className="mt-4 text-center">
+          <Link href="/onboarding" className="text-sm text-brand-accent hover:underline">
+            Or use the onboarding wizard &rarr;
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!campaignCount) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-lg border border-brand-accent bg-brand-primary p-4 text-center">
+          <p className="text-sm text-brand-secondary">
+            Your sites are connected.{" "}
+            <Link href="/onboarding" className="font-medium text-brand-accent hover:underline">
+              Complete the onboarding wizard
+            </Link>{" "}
+            to create your first campaign.
+          </p>
+        </div>
+        {sites.map((site) => (
+          <div key={site.id} className="space-y-2">
+            <h2 className="text-h3 font-semibold text-brand-secondary">{site.url}</h2>
+            <GscSummary siteId={site.id} />
+          </div>
+        ))}
       </div>
     )
   }
