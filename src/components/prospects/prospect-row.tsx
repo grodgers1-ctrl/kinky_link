@@ -29,6 +29,38 @@ export function ProspectRow({
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(prospect.title || "")
   const [saving, setSaving] = useState(false)
+  const [findingEmail, setFindingEmail] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+
+  const handleFindEmail = async () => {
+    setFindingEmail(true)
+    try {
+      const res = await fetch("/api/prospects/find-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prospectIds: [prospect.id] }),
+      })
+      if (res.ok) onUpdated()
+    } catch {
+      // silently handle
+    }
+    setFindingEmail(false)
+  }
+
+  const handleVerify = async () => {
+    setVerifying(true)
+    try {
+      const res = await fetch("/api/prospects/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prospectId: prospect.id, email: prospect.email }),
+      })
+      if (res.ok) onUpdated()
+    } catch {
+      // silently handle
+    }
+    setVerifying(false)
+  }
 
   const save = async (updates: Record<string, unknown>) => {
     setSaving(true)
@@ -79,7 +111,32 @@ export function ProspectRow({
         )}
       </td>
       <td className="px-4 py-3"><DABadge da={prospect.domain_authority} /></td>
-      <td className="px-4 py-3">{prospect.email || "—"}</td>
+      <td className="px-4 py-3">
+        {prospect.email ? (
+          <span className="flex items-center gap-1">
+            <span className="truncate text-sm">{prospect.email}</span>
+            {prospect.email_verified ? (
+              <span className="inline-flex rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">&#10003;</span>
+            ) : (
+              <button
+                onClick={handleVerify}
+                disabled={verifying}
+                className="shrink-0 text-xs text-yellow-600 hover:underline disabled:opacity-50"
+              >
+                {verifying ? "..." : "Verify"}
+              </button>
+            )}
+          </span>
+        ) : (
+          <button
+            onClick={handleFindEmail}
+            disabled={findingEmail}
+            className="text-xs text-brand-accent hover:underline disabled:opacity-50"
+          >
+            {findingEmail ? "Searching..." : "Find Email"}
+          </button>
+        )}
+      </td>
       <td className="px-4 py-3">
         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[prospect.status] || statusColors.prospect}`}>
           {prospect.status}

@@ -17,6 +17,7 @@ export function ProspectsView({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [tagInput, setTagInput] = useState("")
   const [tagging, setTagging] = useState(false)
+  const [findingAll, setFindingAll] = useState(false)
 
   const fetchProspects = useCallback(async () => {
     setLoading(true)
@@ -102,6 +103,47 @@ export function ProspectsView({
           className="flex-1 rounded-lg border border-[#CCCCCD] bg-brand-white px-3 py-2 text-sm text-brand-secondary placeholder:text-[#999999]"
         />
       </div>
+
+      {prospects.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-lg border border-[#DCDDDE] bg-white p-3">
+            <p className="text-xs text-[#777777]">Total</p>
+            <p className="mt-1 text-xl font-semibold text-brand-secondary">{prospects.length}</p>
+          </div>
+          <div className="rounded-lg border border-[#DCDDDE] bg-white p-3">
+            <p className="text-xs text-[#777777]">Email Found</p>
+            <p className="mt-1 text-xl font-semibold text-green-700">{prospects.filter(p => p.email).length}</p>
+          </div>
+          <div className="rounded-lg border border-[#DCDDDE] bg-white p-3">
+            <p className="text-xs text-[#777777]">Verified</p>
+            <p className="mt-1 text-xl font-semibold text-green-700">{prospects.filter(p => p.email_verified).length}</p>
+          </div>
+        </div>
+      )}
+
+      {prospects.length > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-[#DCDDDE] bg-brand-surface p-3">
+          <span className="text-sm text-[#575858]">Bulk actions:</span>
+          <button
+            onClick={async () => {
+              setFindingAll(true)
+              const ids = prospects.filter(p => !p.email).map(p => p.id)
+              if (ids.length === 0) { setFindingAll(false); return }
+              await fetch("/api/prospects/find-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prospectIds: ids }),
+              })
+              setFindingAll(false)
+              fetchProspects()
+            }}
+            disabled={findingAll}
+            className="rounded border border-[#DCDDDE] bg-white px-3 py-1 text-sm hover:bg-brand-surface disabled:opacity-50"
+          >
+            {findingAll ? "Finding..." : `Find Emails (${prospects.filter(p => !p.email).length})`}
+          </button>
+        </div>
+      )}
 
       {selected.size > 0 && (
         <div className="flex items-center gap-3 rounded-lg bg-brand-primary px-4 py-2">
