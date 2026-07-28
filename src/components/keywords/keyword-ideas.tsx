@@ -30,11 +30,15 @@ export function KeywordIdeas() {
   }
 
   const saveKeyword = async (keyword: string) => {
-    await fetch("/api/keywords", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keyword, source: "suggest" }),
-    })
+    try {
+      await fetch("/api/keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword, source: "suggest" }),
+      })
+    } catch {
+      // silently handle
+    }
   }
 
   return (

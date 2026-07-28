@@ -64,7 +64,7 @@ export function GscKeywords({ sites }: { sites: { id: string; url: string }[] })
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ keyword: kw.keyword, siteId: selectedSite, source: "gsc" }),
-                      }).then(() => { /* silently save */ })}
+                      }).catch(() => {})}
                       className="text-xs text-blue-600 hover:underline"
                     >
                       Save
