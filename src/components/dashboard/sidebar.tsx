@@ -12,6 +12,7 @@ const navItems = [
   { href: "/dashboard/templates", label: "Templates", icon: "FileText" },
   { href: "/dashboard/sequences", label: "Sequences", icon: "Timer" },
   { href: "/dashboard/backlinks", label: "Backlinks", icon: "Link" },
+  { href: "/dashboard/keywords", label: "Keywords", icon: "Search" },
   { href: "/dashboard/settings", label: "Settings", icon: "Settings" },
 ]
 
