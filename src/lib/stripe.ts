@@ -12,5 +12,8 @@ export function getStripe() {
   return _stripe
 }
 
-export const MONTHLY_PRICE_ID = "price_monthly"
-export const YEARLY_PRICE_ID = "price_yearly"
+// Replace with your Stripe price IDs from the Dashboard:
+// Create Products > "Monthly" and "Yearly" (one Product per plan tier),
+// then attach a Price to each. Copy the price_xxx IDs here.
+export const MONTHLY_PRICE_ID = process.env.STRIPE_MONTHLY_PRICE_ID || "price_monthly"
+export const YEARLY_PRICE_ID = process.env.STRIPE_YEARLY_PRICE_ID || "price_yearly"

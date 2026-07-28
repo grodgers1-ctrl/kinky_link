@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/db"
 import { getStripe, MONTHLY_PRICE_ID, YEARLY_PRICE_ID } from "@/lib/stripe"
 import { NextRequest, NextResponse } from "next/server"
+import crypto from "crypto"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
       .eq("id", session.user.id)
       .single()
 
+    const idLabel = `lightlinks_${crypto.randomUUID().slice(0, 8)}`
+
     const stripeSession = await getStripe().checkout.sessions.create({
       customer: user?.stripe_customer_id || undefined,
       customer_email: user?.stripe_customer_id ? undefined : session.user.email,
@@ -30,7 +33,8 @@ export async function POST(req: NextRequest) {
         metadata: { userId: session.user.id },
       },
       metadata: { userId: session.user.id },
-      success_url: `${process.env.AUTH_URL}/dashboard?checkout=success`,
+      integration_identifier: idLabel,
+      success_url: `${process.env.AUTH_URL}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.AUTH_URL}/pricing`,
     })
 
