@@ -1,6 +1,8 @@
 "use client"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { AiDraftButton } from "@/components/ai/ai-draft-button"
+import { SpamScoreBadge } from "@/components/ui/spam-score-badge"
+import { scoreEmail } from "@/lib/spam-score"
 
 const MERGE_TAGS = [
   { tag: "{{first_name}}", label: "First Name" },
@@ -25,6 +27,11 @@ export function TemplateEditor({
   const [bodyHtml, setBodyHtml] = useState(template?.body_html || "")
   const [bodyText, setBodyText] = useState(template?.body_text || "")
   const [saving, setSaving] = useState(false)
+
+  const spamScore = useMemo(
+    () => scoreEmail({ subject, bodyHtml, bodyText }),
+    [subject, bodyHtml, bodyText],
+  )
 
   const insertTag = (tag: string) => {
     setBodyHtml((prev) => prev + tag)
@@ -55,7 +62,7 @@ export function TemplateEditor({
         className="w-full rounded-lg border border-[#CCCCCD] bg-brand-white px-3 py-2 text-sm text-brand-secondary placeholder:text-[#999999]"
       />
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <AiDraftButton
           onDraftGenerated={(draft) => {
             setSubject(draft.subject)
@@ -63,6 +70,7 @@ export function TemplateEditor({
             setBodyText(draft.bodyText)
           }}
         />
+        {(subject || bodyHtml) && <SpamScoreBadge result={spamScore} />}
       </div>
 
       <div className="flex flex-wrap gap-2">

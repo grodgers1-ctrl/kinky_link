@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
+import { scoreEmail } from "@/lib/spam-score"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(req: NextRequest) {
@@ -32,13 +33,21 @@ export async function POST(req: NextRequest) {
       campaignType: campaignType || "outreach",
     })
 
+    const spamScore = scoreEmail({
+      subject: draft.subject,
+      bodyHtml: draft.bodyHtml,
+      bodyText: draft.bodyText,
+    })
+
     return NextResponse.json({
       draft,
+      spamScore,
       remaining: getAiUsageRemaining(session.user.id),
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error("AI draft error:", error)
-    return NextResponse.json({ error: error.message || "Failed to generate draft" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to generate draft"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

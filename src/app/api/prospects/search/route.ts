@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth"
-import { scrapeSerp } from "@/lib/scraper"
-import { getMozMetrics } from "@/lib/moz"
+import { getSerpForKeyword } from "@/lib/corpus"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function GET(req: NextRequest) {
@@ -20,18 +19,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Keyword too long" }, { status: 400 })
     }
 
-    const results = await scrapeSerp(keyword)
+    const results = await getSerpForKeyword(keyword)
 
-    const enriched = await Promise.all(
-      results.slice(0, 10).map(async (result) => {
-        const moz = await getMozMetrics(result.domain)
-        return { ...result, domainAuthority: moz.domainAuthority }
-      })
-    )
-
-    return NextResponse.json({ results: enriched })
+    return NextResponse.json({ results: results.slice(0, 10) })
   } catch (error) {
-    console.error("SERP scrape error:", error)
+    console.error("SERP search error:", error)
     return NextResponse.json({ error: "Failed to search prospects" }, { status: 500 })
   }
 }
