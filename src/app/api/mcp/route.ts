@@ -10,6 +10,8 @@ import {
   INTERNAL_ERROR,
 } from "@/lib/mcp/protocol"
 import type { JsonRpcRequest } from "@/lib/mcp/types"
+import { toolSchemas, findTool, errorResult } from "@/lib/mcp/tools"
+import "@/lib/mcp/handlers"
 
 export const runtime = "nodejs"
 
@@ -57,7 +59,17 @@ export async function POST(req: NextRequest) {
       case "notifications/initialized":
         return new NextResponse(null, { status: 202 })
       case "tools/list":
-        return NextResponse.json(ok(rpc, { tools: [] }))
+        return NextResponse.json(ok(rpc, { tools: toolSchemas() }))
+      case "tools/call": {
+        const params =
+          (rpc.params as { name?: string; arguments?: Record<string, unknown> }) || {}
+        const tool = params.name ? findTool(params.name) : undefined
+        if (!tool) {
+          return NextResponse.json(ok(rpc, errorResult(`Unknown tool: ${params.name}`)))
+        }
+        const result = await tool.handler(userId, params.arguments || {})
+        return NextResponse.json(ok(rpc, result))
+      }
       case "resources/list":
         return NextResponse.json(ok(rpc, { resources: [] }))
       case "prompts/list":

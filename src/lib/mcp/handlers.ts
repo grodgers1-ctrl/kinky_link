@@ -1,0 +1,288 @@
+import { supabaseAdmin } from "@/lib/db"
+import { getSerpForKeyword, getDomainFacts } from "@/lib/corpus"
+import { hunterFindEmail } from "@/lib/hunter"
+import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
+import { scoreEmail } from "@/lib/spam-score"
+import { registerTool, jsonResult, errorResult } from "./tools"
+
+registerTool({
+  name: "search_prospects",
+  description:
+    "Find prospect sites for a keyword. Uses the shared SERP cache when fresh; scrapes Google on miss. Returns url, title, domain, position, and Moz Domain Authority.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      keyword: { type: "string", description: "Search phrase (2-200 chars)" },
+      limit: { type: "integer", minimum: 1, maximum: 20, default: 10 },
+    },
+    required: ["keyword"],
+  },
+  handler: async (_userId, args) => {
+    const keyword = String(args.keyword || "").trim()
+    if (!keyword) return errorResult("keyword is required")
+    if (keyword.length > 200) return errorResult("keyword too long")
+    const limit = Math.min(20, Math.max(1, Number(args.limit) || 10))
+    const results = await getSerpForKeyword(keyword)
+    return jsonResult(results.slice(0, limit))
+  },
+})
+
+registerTool({
+  name: "enrich_domain",
+  description:
+    "Return known facts about a domain: Moz Domain Authority, cached contact email, homepage title/description. Data is shared across all users of linklight so common domains are instant.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      domain: { type: "string", description: "Bare hostname, e.g. example.com" },
+    },
+    required: ["domain"],
+  },
+  handler: async (_userId, args) => {
+    const domain = String(args.domain || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/.*$/, "")
+    if (!domain) return errorResult("domain is required")
+    const facts = await getDomainFacts([domain])
+    const { data: full } = await supabaseAdmin
+      .from("domain_facts")
+      .select("domain, domain_authority, contact_email, title, description, last_seen_at, seen_count")
+      .eq("domain", domain)
+      .maybeSingle()
+    return jsonResult({ domain, ...facts[domain], details: full })
+  },
+})
+
+registerTool({
+  name: "list_campaigns",
+  description: "List the caller's campaigns with id, name, status, and created_at.",
+  inputSchema: { type: "object", properties: {} },
+  handler: async (userId) => {
+    const { data } = await supabaseAdmin
+      .from("campaigns")
+      .select("id, name, status, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+    return jsonResult(data || [])
+  },
+})
+
+registerTool({
+  name: "list_prospects",
+  description:
+    "List prospects. Filter by campaign_id and/or status (prospect|contacted|replied|live_link|declined|archived).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      campaign_id: { type: "string" },
+      status: { type: "string" },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+    },
+  },
+  handler: async (userId, args) => {
+    const limit = Math.min(100, Math.max(1, Number(args.limit) || 50))
+    let q = supabaseAdmin
+      .from("prospects")
+      .select("id, campaign_id, url, domain, title, email, status, domain_authority, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+    if (args.campaign_id) q = q.eq("campaign_id", String(args.campaign_id))
+    if (args.status) q = q.eq("status", String(args.status))
+    const { data } = await q
+    return jsonResult(data || [])
+  },
+})
+
+registerTool({
+  name: "list_backlinks",
+  description:
+    "List backlinks earned to a site. Filter by health_status (healthy|redirected|broken|unreachable|pending|error).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      site_id: { type: "string" },
+      health_status: { type: "string" },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+    },
+  },
+  handler: async (userId, args) => {
+    const limit = Math.min(100, Math.max(1, Number(args.limit) || 50))
+    let q = supabaseAdmin
+      .from("backlinks")
+      .select(
+        "id, site_id, source_url, target_url, anchor_text, first_seen, last_seen, is_indexed, health_status, last_health_check",
+      )
+      .eq("user_id", userId)
+      .order("last_seen", { ascending: false, nullsFirst: false })
+      .limit(limit)
+    if (args.site_id) q = q.eq("site_id", String(args.site_id))
+    if (args.health_status) q = q.eq("health_status", String(args.health_status))
+    const { data } = await q
+    return jsonResult(data || [])
+  },
+})
+
+registerTool({
+  name: "list_replies",
+  description:
+    "List prospects who replied to outreach. Optionally filter by ISO-8601 since date.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      since: {
+        type: "string",
+        description: "ISO-8601 timestamp; only prospects updated after this",
+      },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+    },
+  },
+  handler: async (userId, args) => {
+    const limit = Math.min(100, Math.max(1, Number(args.limit) || 50))
+    let q = supabaseAdmin
+      .from("prospects")
+      .select("id, campaign_id, url, domain, title, email, status, updated_at")
+      .eq("user_id", userId)
+      .eq("status", "replied")
+      .order("updated_at", { ascending: false })
+      .limit(limit)
+    if (args.since) q = q.gt("updated_at", String(args.since))
+    const { data } = await q
+    return jsonResult(data || [])
+  },
+})
+
+registerTool({
+  name: "find_email",
+  description:
+    "Look up a contact email for a domain via Hunter. Cached in domain_facts on hit.",
+  inputSchema: {
+    type: "object",
+    properties: { domain: { type: "string" } },
+    required: ["domain"],
+  },
+  handler: async (_userId, args) => {
+    const domain = String(args.domain || "").trim().toLowerCase()
+    if (!domain) return errorResult("domain is required")
+
+    const { data: cached } = await supabaseAdmin
+      .from("domain_facts")
+      .select("contact_email, email_fetched_at")
+      .eq("domain", domain)
+      .maybeSingle()
+    if (cached?.contact_email) {
+      return jsonResult({ domain, email: cached.contact_email, source: "cache" })
+    }
+
+    const res = await hunterFindEmail(domain)
+    if (res.email) {
+      const now = new Date().toISOString()
+      await supabaseAdmin.from("domain_facts").upsert(
+        {
+          domain,
+          contact_email: res.email,
+          email_fetched_at: now,
+          last_seen_at: now,
+        },
+        { onConflict: "domain" },
+      )
+    }
+    return jsonResult({ domain, email: res.email, confidence: res.confidence, source: res.source || "live" })
+  },
+})
+
+registerTool({
+  name: "draft_email",
+  description:
+    "Generate an outreach email draft. Returns subject, HTML body, plain-text body, and a spam score (0-10, higher = better).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      topic: { type: "string", description: "What the email is about" },
+      article_title: { type: "string", description: "Their article being referenced (optional)" },
+      site_name: { type: "string" },
+      prospect_name: { type: "string" },
+      tone: {
+        type: "string",
+        enum: ["friendly", "professional", "direct"],
+        default: "friendly",
+      },
+      campaign_type: { type: "string", default: "outreach" },
+    },
+    required: ["topic"],
+  },
+  handler: async (userId, args) => {
+    if (!checkAiUsage(userId)) {
+      return errorResult(
+        `Daily AI writing limit reached. Remaining: ${getAiUsageRemaining(userId)}`,
+      )
+    }
+    const draft = await generateEmailDraft({
+      topic: String(args.topic),
+      articleTitle: args.article_title ? String(args.article_title) : undefined,
+      siteName: args.site_name ? String(args.site_name) : undefined,
+      prospectName: args.prospect_name ? String(args.prospect_name) : undefined,
+      tone:
+        (args.tone as "friendly" | "professional" | "direct" | undefined) ||
+        "friendly",
+      campaignType:
+        (args.campaign_type as
+          | "outreach"
+          | "guest_post"
+          | "resource_page"
+          | "skyscraper"
+          | "link_reclamation"
+          | undefined) || "outreach",
+    })
+    const spamScore = scoreEmail({
+      subject: draft.subject,
+      bodyHtml: draft.bodyHtml,
+      bodyText: draft.bodyText,
+    })
+    return jsonResult({ draft, spamScore, remaining: getAiUsageRemaining(userId) })
+  },
+})
+
+registerTool({
+  name: "save_draft",
+  description:
+    "Save a drafted email as a note on a prospect. Does NOT send — user must review and send from the linklight UI.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      prospect_id: { type: "string" },
+      subject: { type: "string" },
+      body_html: { type: "string" },
+      body_text: { type: "string" },
+    },
+    required: ["prospect_id", "subject", "body_html"],
+  },
+  handler: async (userId, args) => {
+    const prospectId = String(args.prospect_id)
+    const subject = String(args.subject)
+    const bodyHtml = String(args.body_html)
+    const bodyText = args.body_text ? String(args.body_text) : ""
+
+    const { data: prospect } = await supabaseAdmin
+      .from("prospects")
+      .select("id, notes")
+      .eq("id", prospectId)
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (!prospect) return errorResult("Prospect not found")
+
+    const stamp = new Date().toISOString()
+    const marker = `--- MCP DRAFT ${stamp} ---\nSubject: ${subject}\n\n${bodyText || bodyHtml.replace(/<[^>]+>/g, " ")}\n`
+    const combined = prospect.notes ? `${prospect.notes}\n\n${marker}` : marker
+
+    const { error } = await supabaseAdmin
+      .from("prospects")
+      .update({ notes: combined, updated_at: stamp })
+      .eq("id", prospectId)
+      .eq("user_id", userId)
+    if (error) return errorResult(`Failed to save draft: ${error.message}`)
+    return jsonResult({ ok: true, prospect_id: prospectId, saved_at: stamp })
+  },
+})

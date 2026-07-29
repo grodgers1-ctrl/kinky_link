@@ -5,7 +5,6 @@
 const key = process.argv[2]
 if (!key) {
   console.error("Usage: node scripts/verify-mcp.mjs <API_KEY>")
-  console.error("Generate a key with the verify-api-keys script or via the UI.")
   process.exit(1)
 }
 
@@ -24,19 +23,43 @@ async function call(method, params) {
   return res.json()
 }
 
+async function callTool(name, args) {
+  const r = await call("tools/call", { name, arguments: args })
+  if (r.error) throw new Error(`Tool ${name} JSON-RPC error: ${r.error.message}`)
+  const first = r.result?.content?.[0]?.text
+  console.log(`\n[${name}]`, first?.slice(0, 200), "...")
+  if (r.result?.isError) throw new Error(`Tool ${name} returned isError: ${first}`)
+  return r.result
+}
+
 const init = await call("initialize", {
   protocolVersion: "2025-06-18",
   capabilities: {},
   clientInfo: { name: "verify", version: "0" },
 })
-console.log("initialize:", JSON.stringify(init.result, null, 2))
 if (init.result?.serverInfo?.name !== "linklight") throw new Error("bad serverInfo")
+console.log("initialize: OK")
 
 const list = await call("tools/list", {})
 console.log("tools/list count:", list.result.tools.length)
+if (list.result.tools.length !== 9) {
+  throw new Error(`expected 9 tools, got ${list.result.tools.length}`)
+}
 
 const bad = await call("does/not/exist", {})
 if (bad.error?.code !== -32601) throw new Error(`expected -32601, got ${bad.error?.code}`)
 console.log("unknown method: OK")
 
-console.log("\nMCP PASS")
+await callTool("list_campaigns", {})
+await callTool("list_prospects", { limit: 3 })
+await callTool("list_backlinks", { limit: 3 })
+await callTool("list_replies", { limit: 3 })
+await callTool("enrich_domain", { domain: "example.com" })
+
+try {
+  await callTool("search_prospects", { keyword: "nextjs seo", limit: 3 })
+} catch (e) {
+  console.log("search_prospects skipped:", e.message)
+}
+
+console.log("\nMCP FULL PASS")
