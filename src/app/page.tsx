@@ -46,6 +46,13 @@ const FEATURES = [
       <path d="M10.6 13.4a5 5 0 0 1 0-7.07l3-3a5 5 0 0 1 7.07 7.08l-1.5 1.5-1.42-1.42 1.5-1.5a3 3 0 1 0-4.24-4.24l-3 3a3 3 0 0 0 0 4.24l-1.4 1.42ZM13.4 10.6a5 5 0 0 1 0 7.07l-3 3a5 5 0 1 1-7.07-7.08l1.5-1.5 1.42 1.42-1.5 1.5a3 3 0 1 0 4.24 4.24l3-3a3 3 0 0 0 0-4.24l1.4-1.42Z" />
     ),
   },
+  {
+    title: "Works with your AI agent",
+    body: "First-class MCP server. Plug linklight into Claude Desktop, Claude Code, or Cursor and your agent can drive campaigns end-to-end. See docs.",
+    icon: (
+      <path d="M12 2 4 6v6c0 5 3.5 9.7 8 10 4.5-.3 8-5 8-10V6l-8-4Zm0 5a3 3 0 0 1 3 3v1h1v6H8v-6h1v-1a3 3 0 0 1 3-3Zm-1 4h2v-1a1 1 0 0 0-2 0v1Z" />
+    ),
+  },
 ]
 
 const STEPS = [
@@ -105,6 +112,12 @@ export default async function Home() {
               className="hidden text-[#575858] hover:text-brand-secondary sm:inline"
             >
               Features
+            </Link>
+            <Link
+              href="/docs/mcp"
+              className="hidden text-[#575858] hover:text-brand-secondary sm:inline"
+            >
+              Docs
             </Link>
             <Link
               href="#signin"
