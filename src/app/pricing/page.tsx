@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { supabase } from "@/lib/db"
+import { supabaseAdmin as supabase } from "@/lib/db"
 import { PricingCards } from "@/components/billing/pricing-cards"
 
 export default async function PricingPage() {

@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { supabase } from "@/lib/db"
+import { supabaseAdmin as supabase } from "@/lib/db"
 import { redirect } from "next/navigation"
 import { ConnectSitePrompt } from "@/components/dashboard/connect-site-card"
 import { GscSummary } from "@/components/dashboard/gsc-summary"

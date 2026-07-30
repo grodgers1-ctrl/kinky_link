@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { supabase } from "@/lib/db"
+import { supabaseAdmin as supabase } from "@/lib/db"
 import { notFound, redirect } from "next/navigation"
 import { BacklinkDetail } from "@/components/backlinks/backlink-detail"
 
