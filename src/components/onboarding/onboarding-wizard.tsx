@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react"
 
 const STEPS = [
   { id: "welcome", label: "Welcome" },
+  { id: "path", label: "Setup path" },
   { id: "connect", label: "Connect Google" },
   { id: "site", label: "Add Your Site" },
   { id: "campaign", label: "First Campaign" },
@@ -21,13 +22,18 @@ export function OnboardingWizard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [prospectCount, setProspectCount] = useState(0)
+  const [path, setPath] = useState<"human" | "agent" | null>(null)
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [creatingKey, setCreatingKey] = useState(false)
   const router = useRouter()
 
   const fetchSites = useCallback(async () => {
     try {
       const res = await fetch("/api/sites")
       const data = await res.json()
-      const list = (data.sites || []).map((s: any) => ({ url: s.siteUrl || s.url }))
+      const list = (data.sites || []).map((s: { siteUrl?: string; url?: string }) => ({
+        url: s.siteUrl || s.url || "",
+      }))
       setSites(list)
       if (list.length > 0) setSelectedSiteUrl(list[0].url)
     } catch {
@@ -36,7 +42,7 @@ export function OnboardingWizard() {
   }, [])
 
   useEffect(() => {
-    if (step === 2) fetchSites()
+    if (step === 3) fetchSites()
   }, [step, fetchSites])
 
   const nextStep = () => { setStep(s => Math.min(s + 1, STEPS.length - 1)); setError("") }
@@ -90,6 +96,28 @@ export function OnboardingWizard() {
     nextStep()
   }
 
+  const createAgentKey = async () => {
+    setCreatingKey(true)
+    setError("")
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "MCP client (onboarding)" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || "Failed to create key")
+        return
+      }
+      setApiKey(data.raw)
+    } catch {
+      setError("Network error creating key")
+    } finally {
+      setCreatingKey(false)
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-4 py-12">
       <div className="flex items-center justify-center gap-2">
@@ -131,6 +159,40 @@ export function OnboardingWizard() {
 
         {step === 1 && (
           <div className="text-center">
+            <h2 className="text-h2 font-bold text-brand-secondary">How will you use linklight?</h2>
+            <p className="mt-2 text-body text-[#575858]">Pick the setup that matches how you work.</p>
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              <button
+                onClick={() => {
+                  setPath("human")
+                  nextStep()
+                }}
+                className="rounded-xl border border-[#DCDDDE] bg-brand-white p-6 text-left hover:border-brand-accent"
+              >
+                <p className="text-h3 font-bold text-brand-secondary">Dashboard</p>
+                <p className="mt-1 text-sm text-[#575858]">
+                  I&apos;ll connect a site, create a campaign, and drive linklight from the web app.
+                </p>
+              </button>
+              <button
+                onClick={async () => {
+                  setPath("agent")
+                  await createAgentKey()
+                  setStep(STEPS.length - 1)
+                }}
+                className="rounded-xl border border-[#DCDDDE] bg-brand-white p-6 text-left hover:border-brand-accent"
+              >
+                <p className="text-h3 font-bold text-brand-secondary">AI agent</p>
+                <p className="mt-1 text-sm text-[#575858]">
+                  I&apos;ll plug linklight into Claude Desktop / Code / Cursor via MCP.
+                </p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="text-center">
             <h2 className="text-h2 font-bold text-brand-secondary">Connect Your Google Account</h2>
             <p className="mt-2 text-body text-[#575858]">
               kinkylink needs access to Gmail (to send emails) and Google Search Console (to monitor backlinks).
@@ -156,7 +218,7 @@ export function OnboardingWizard() {
           </div>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="text-center">
             <h2 className="text-h2 font-bold text-brand-secondary">Select Your Site</h2>
             <p className="mt-2 text-body text-[#575858]">
@@ -197,7 +259,7 @@ export function OnboardingWizard() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div>
             <h2 className="text-h2 font-bold text-brand-secondary">Create Your First Campaign</h2>
             <p className="mt-2 text-body text-[#575858]">Give your link building campaign a name.</p>
@@ -222,7 +284,7 @@ export function OnboardingWizard() {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div>
             <h2 className="text-h2 font-bold text-brand-secondary">Find Your First Prospects</h2>
             <p className="mt-2 text-body text-[#575858]">
@@ -249,32 +311,80 @@ export function OnboardingWizard() {
           </div>
         )}
 
-        {step === 5 && (
+        {step === STEPS.length - 1 && (
           <div className="text-center">
-            <h2 className="text-h2 font-bold text-brand-secondary">You&apos;re All Set!</h2>
-            <p className="mt-2 text-body text-[#575858]">
-              Your campaign is ready. Start adding prospects, writing emails, and building links.
-            </p>
-            <div className="mt-8 grid grid-cols-3 gap-4">
-              <div className="rounded-lg border border-[#DCDDDE] p-4">
-                <p className="text-2xl font-bold text-brand-accent">1</p>
-                <p className="mt-1 text-sm text-[#575858]">Campaign created</p>
-              </div>
-              <div className="rounded-lg border border-[#DCDDDE] p-4">
-                <p className="text-2xl font-bold text-brand-accent">{prospectCount || "10+"}</p>
-                <p className="mt-1 text-sm text-[#575858]">Prospects found</p>
-              </div>
-              <div className="rounded-lg border border-[#DCDDDE] p-4">
-                <p className="text-2xl font-bold text-brand-accent">Ready</p>
-                <p className="mt-1 text-sm text-[#575858]">To send emails</p>
-              </div>
-            </div>
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="mt-8 rounded-lg bg-brand-accent px-8 py-3 text-body font-medium text-white hover:opacity-90"
-            >
-              Go to Dashboard
-            </button>
+            {path === "agent" ? (
+              <>
+                <h2 className="text-h2 font-bold text-brand-secondary">You&apos;re ready. Plug this into your agent.</h2>
+                <p className="mt-2 text-body text-[#575858]">
+                  Copy the key and paste the config into Claude Desktop, Claude Code, or Cursor.
+                </p>
+                {apiKey ? (
+                  <div className="mt-6 rounded-lg border border-brand-accent bg-[#FFF0F2] p-4">
+                    <p className="text-sm text-[#575858]">This is the only time your key will be shown.</p>
+                    <code className="mt-2 block overflow-x-auto rounded bg-brand-white px-3 py-2 font-mono text-xs text-brand-secondary">
+                      {apiKey}
+                    </code>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(apiKey)}
+                      className="mt-3 rounded-lg bg-brand-secondary px-4 py-2 text-sm font-medium text-brand-white hover:bg-[#1f0066]"
+                    >
+                      Copy key
+                    </button>
+                  </div>
+                ) : creatingKey ? (
+                  <p className="mt-6 text-sm text-[#575858]">Generating your key…</p>
+                ) : (
+                  <button
+                    onClick={createAgentKey}
+                    className="mt-6 rounded-lg bg-brand-secondary px-6 py-3 text-sm font-medium text-brand-white hover:bg-[#1f0066]"
+                  >
+                    Generate my key
+                  </button>
+                )}
+                <div className="mt-6 flex flex-col gap-3 text-sm sm:flex-row sm:justify-center">
+                  <a
+                    href="/docs/mcp"
+                    className="rounded-lg bg-brand-accent px-4 py-2 font-medium text-white hover:opacity-90"
+                  >
+                    Setup snippets &rarr;
+                  </a>
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    className="text-brand-accent hover:underline"
+                  >
+                    Or open the dashboard
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-h2 font-bold text-brand-secondary">You&apos;re All Set!</h2>
+                <p className="mt-2 text-body text-[#575858]">
+                  Your campaign is ready. Start adding prospects, writing emails, and building links.
+                </p>
+                <div className="mt-8 grid grid-cols-3 gap-4">
+                  <div className="rounded-lg border border-[#DCDDDE] p-4">
+                    <p className="text-2xl font-bold text-brand-accent">1</p>
+                    <p className="mt-1 text-sm text-[#575858]">Campaign created</p>
+                  </div>
+                  <div className="rounded-lg border border-[#DCDDDE] p-4">
+                    <p className="text-2xl font-bold text-brand-accent">{prospectCount || "10+"}</p>
+                    <p className="mt-1 text-sm text-[#575858]">Prospects found</p>
+                  </div>
+                  <div className="rounded-lg border border-[#DCDDDE] p-4">
+                    <p className="text-2xl font-bold text-brand-accent">Ready</p>
+                    <p className="mt-1 text-sm text-[#575858]">To send emails</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push("/dashboard")}
+                  className="mt-8 rounded-lg bg-brand-accent px-8 py-3 text-body font-medium text-white hover:opacity-90"
+                >
+                  Go to Dashboard
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
