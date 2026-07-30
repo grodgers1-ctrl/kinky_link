@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# linklight
 
-## Getting Started
+**The MCP server for SEO.** Plug linklight into Claude Desktop, Claude Code, or Cursor and let your AI agent find prospects, draft outreach, and monitor backlinks — you approve and send.
 
-First, run the development server:
+Dashboard included. But the agent is the point.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 60-second setup
+
+1. Sign in at [lightlinks.dev](https://lightlinks.dev) with Google.
+2. Go to **Settings → API Access → Generate key**. Copy it.
+3. Paste this into `~/.claude/settings.json` (or your MCP client's config):
+
+   ```json
+   {
+     "mcpServers": {
+       "linklight": {
+         "type": "http",
+         "url": "https://lightlinks.dev/api/mcp",
+         "headers": { "Authorization": "Bearer sk_ll_PASTE_YOUR_KEY_HERE" }
+       }
+     }
+   }
+   ```
+
+4. Restart your MCP client. Ask your agent: *"List my linklight campaigns."*
+
+Full docs: **[lightlinks.dev/docs/mcp](https://lightlinks.dev/docs/mcp)**.
+
+## What your agent can do
+
+| Tool | What it does |
+|---|---|
+| `search_prospects(keyword)` | Find prospect sites for a topic (Tavily-backed, DA-enriched) |
+| `find_similar_prospects(url)` | Given one good prospect, return 20 more like it (Exa.ai neural search) |
+| `enrich_domain(domain)` | DA + contact email + homepage title/description |
+| `find_email(domain)` | Look up a contact email (Hunter) |
+| `draft_email(topic)` | Write a personalised outreach email with a built-in spam score |
+| `save_draft(prospect_id, subject, body)` | Save a drafted email against a prospect for you to review |
+| `find_quick_win_keywords(site_id)` | Return striking-distance keywords (pages 2-3 with impressions) |
+| `find_prospect_gaps(campaign_id)` | Prospects in a campaign missing an email, sorted by DA |
+| `list_lost_backlinks(site_id)` | Backlinks currently broken, unreachable, or redirected |
+| `list_campaigns` / `list_prospects` / `list_replies` / `list_backlinks` | Query your data |
+
+Sending emails is **never** exposed as an MCP tool. Every send needs your manual approval in the dashboard.
+
+## Example agent prompts
+
+```
+Find the top 20 prospects for "nextjs seo" with DA ≥ 40.
+For each, draft a warm personalised email referencing their most recent post,
+save each draft against the prospect, and show me the spam scores.
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```
+List my lost backlinks from the past 30 days, group by domain,
+and tell me which ones are worth reaching out to.
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+For campaign "Q4 outreach", find prospects without emails and run find_email
+on the top 10 by domain authority.
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Pricing
 
-## Learn More
+$12.99/mo. 7-day free trial, no credit card required.
 
-To learn more about Next.js, take a look at the following resources:
+## Under the hood
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Next.js 16 (Turbopack) on Vercel
+- Supabase (Postgres) with RLS on every table
+- NextAuth + Google OAuth (Gmail + Search Console)
+- Tavily for real-time web search
+- Exa.ai for semantic prospect discovery
+- OpenAI for email drafting
+- Moz + Hunter for enrichment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Proprietary. All rights reserved.

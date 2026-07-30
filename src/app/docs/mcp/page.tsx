@@ -103,11 +103,52 @@ export default async function McpDocsPage() {
 
         <section className="mt-12 rounded-lg border border-[#DCDDDE] bg-brand-primary p-6">
           <h2 className="text-lg font-semibold text-brand-secondary">Try prompting your agent</h2>
-          <pre className="mt-3 overflow-x-auto rounded bg-brand-white p-4 font-mono text-xs text-brand-secondary">
+          <div className="mt-3 space-y-3">
+            <pre className="overflow-x-auto rounded bg-brand-white p-4 font-mono text-xs text-brand-secondary">
 {`Find the top 10 prospects for "nextjs seo" with DA ≥ 40.
 For each, draft a warm personalized email referencing their most recent post,
 save each draft against the prospect, and show me the spam scores.`}
-          </pre>
+            </pre>
+            <pre className="overflow-x-auto rounded bg-brand-white p-4 font-mono text-xs text-brand-secondary">
+{`I already have one great prospect at https://backlinko.com. Use find_similar_prospects
+to give me 20 more sites like it, ranked by score.`}
+            </pre>
+            <pre className="overflow-x-auto rounded bg-brand-white p-4 font-mono text-xs text-brand-secondary">
+{`Show me all lost backlinks from the past 14 days for my main site, grouped by
+domain, then draft outreach to try to recover the top 5.`}
+            </pre>
+            <pre className="overflow-x-auto rounded bg-brand-white p-4 font-mono text-xs text-brand-secondary">
+{`Find my quick-win keywords, pick the top 3 by opportunity score, and suggest
+content-gap articles I could write to move them onto page 1.`}
+            </pre>
+          </div>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="text-2xl font-semibold text-brand-secondary">What linklight will NOT do</h2>
+          <p className="mt-2 text-[#575858]">
+            The MCP surface is deliberately narrower than your dashboard capabilities. There is no
+            &ldquo;send this email&rdquo; tool and no destructive tools. Anything with real-world
+            consequence stays behind a manual tap in the web app.
+          </p>
+          <ul className="mt-4 space-y-2 text-sm text-[#575858]">
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-brand-accent">&#10007;</span>
+              <span>Never sends outreach — save_draft is the closest tool, and it just leaves notes for you to review.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-brand-accent">&#10007;</span>
+              <span>Never deletes prospects, campaigns, or backlinks.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-brand-accent">&#10007;</span>
+              <span>Never changes your billing tier or issues refunds.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 text-brand-accent">&#10007;</span>
+              <span>Never touches other users&apos; data — every tool is scoped to the caller.</span>
+            </li>
+          </ul>
         </section>
       </main>
 
