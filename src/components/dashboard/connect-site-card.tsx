@@ -1,9 +1,16 @@
 "use client"
 import { useState } from "react"
 
+interface CtaLink {
+  label: string
+  url: string
+}
+
 interface ErrorState {
   message: string
   detail?: string
+  action?: CtaLink
+  adminNote?: CtaLink
 }
 
 export function ConnectSitePrompt() {
@@ -18,7 +25,12 @@ export function ConnectSitePrompt() {
       const res = await fetch("/api/sites")
       const data = await res.json()
       if (!res.ok) {
-        setError({ message: data.error || "Failed to connect", detail: data.detail })
+        setError({
+          message: data.error || "Failed to connect",
+          detail: data.detail,
+          action: data.action,
+          adminNote: data.adminNote,
+        })
         return
       }
       setSites(data.sites || [])
@@ -39,10 +51,30 @@ export function ConnectSitePrompt() {
       </p>
 
       {error && (
-        <div className="mt-3 space-y-1">
+        <div className="mt-3 space-y-2">
           <p className="text-sm font-medium text-brand-accent">{error.message}</p>
           {error.detail && (
             <p className="text-xs text-[#575858]">{error.detail}</p>
+          )}
+          {error.action && (
+            <a
+              href={error.action.url}
+              target={error.action.url.startsWith("http") ? "_blank" : undefined}
+              rel={error.action.url.startsWith("http") ? "noopener noreferrer" : undefined}
+              className="inline-block rounded-lg bg-brand-accent px-4 py-1.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              {error.action.label} &rarr;
+            </a>
+          )}
+          {error.adminNote && (
+            <a
+              href={error.adminNote.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 block text-xs text-[#575858] underline hover:text-brand-secondary"
+            >
+              {error.adminNote.label} &rarr;
+            </a>
           )}
         </div>
       )}
