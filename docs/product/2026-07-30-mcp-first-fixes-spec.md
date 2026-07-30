@@ -28,19 +28,19 @@ Product is now **"The MCP Server for SEO"** — the default backlink-building in
 
 These are broken for both dashboard users and MCP callers today. Highest ROI per hour.
 
-#### T1.1 — Prospect search reliability (GCSE swap)
+#### T1.1 — Prospect search reliability (Tavily swap)
 **Why:** `scrapeSerp` in [src/lib/scraper.ts](../../src/lib/scraper.ts) hits `google.com/search` directly. From Vercel serverless (datacenter IP), Google returns a bot-detection page. Cheerio finds zero `div.g`, returns `[]`. Dashboard shows "No prospects found" on every fresh keyword; MCP's `search_prospects` tool returns empty arrays; corpus cache never populates. **This kills the core value prop for both surfaces.**
 
-**Fix:** Replace with Google Programmable Search Engine (Custom Search). Free tier: 100 queries/day forever, JSON API, no bot detection.
+**Fix:** Replace with Tavily Search API — designed for AI agents, JSON response, 1,000 queries/mo free tier (Google CSE was our first choice but Google is deprecating the "Search the entire web" feature; Brave dropped its free tier; Tavily is the last real free option and it happens to match the MCP-first positioning perfectly).
 
-- New env vars: `GOOGLE_CSE_ID`, `GOOGLE_CSE_KEY`
-- Rewrite `src/lib/scraper.ts` → `searchViaCse(keyword)` returning the same `ProspectResult[]` shape
-- Corpus cache in `src/lib/corpus.ts` continues to amortize the 100/day quota across all users
-- Cost: $0 (free tier). At scale, $5 per 1,000 queries paid — corpus makes this negligible
+- New env var: `TAVILY_API_KEY`
+- Rewrite `src/lib/scraper.ts` → same `scrapeSerp(keyword)` signature, same `ProspectResult[]` return shape, Tavily under the hood
+- Corpus cache in `src/lib/corpus.ts` continues to amortize the 1k/mo quota across all users
+- Cost: $0 at free tier. At scale, $20/mo → 4k queries or metered — corpus makes this small
 
-**Files:** `src/lib/scraper.ts` (rewrite), `.env.local` docs (add two vars), `vercel env` (add two vars)
+**Files:** `src/lib/scraper.ts` (rewrite), `.env.local` (add one var), `vercel env` (add one var)
 
-**MCP impact:** `search_prospects` starts returning real results. This is the single biggest MCP quality win.
+**MCP impact:** `search_prospects` starts returning real results. This is the single biggest MCP quality win. Bonus: Tavily's response shape (title/url/content/score) is LLM-friendly out of the box.
 
 #### T1.2 — Onboarding wizard's `siteId` bug (fixes campaign 404)
 **Why:** [onboarding-wizard.tsx:53](../../src/components/onboarding/onboarding-wizard.tsx) sends `siteId: selectedSiteUrl` where `selectedSiteUrl` is a URL string like `"https://dividendmapper.com/"`, not a UUID. Campaigns row is created with either `site_id = NULL` (best case) or bogus data. When the user clicks that campaign, the `.select("*, sites(url)")` join fails or renders "Campaign not found."
@@ -151,6 +151,8 @@ Not blockers, still on the roadmap. Roughly ordered by user-visible impact.
 ### Tier 4 — Moat building (weeks, defer)
 
 The strategy doc's "proprietary graph" — the actual long-term defensibility. Not urgent.
+
+> **Amendment (2026-07-30):** Since every free wide-web SERP API is drying up (Google CSE killing "Search the entire web", Brave dropping its free tier, Bing Web Search sunset in Aug 2025), the seeded prospect corpus becomes near-critical. Consider promoting **T4.1** to Tier 2 in the next revision. It's the only affordable answer to "what does linklight return when the Tavily free tier runs out?" — a curated corpus means real-time SERP is the exception, not the rule.
 
 - **T4.1 — Seeded directory corpus.** Pre-populate `domain_facts` and (a new) `prospect_lists` table with curated lists of SaaS directories, indie hacker guest post opportunities, and broken-link outreach targets. On first user search of any topic, they see the curated matches immediately alongside the SERP results. This is the "hero content" for every MCP demo.
 - **T4.2 — Outreach outcome tracking.** Track which templates → which domains → which reply rates. Roll up into per-domain acceptance-rate signals. Feed back into agent prompts ("this domain responds to skyscraper pitches at 12%").
