@@ -1,24 +1,29 @@
 "use client"
 import { useState } from "react"
 
+interface ErrorState {
+  message: string
+  detail?: string
+}
+
 export function ConnectSitePrompt() {
   const [loading, setLoading] = useState(false)
   const [sites, setSites] = useState<{ siteUrl: string }[]>([])
-  const [error, setError] = useState("")
+  const [error, setError] = useState<ErrorState | null>(null)
 
   const connectSites = async () => {
     setLoading(true)
-    setError("")
+    setError(null)
     try {
       const res = await fetch("/api/sites")
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || "Failed to connect")
+        setError({ message: data.error || "Failed to connect", detail: data.detail })
         return
       }
       setSites(data.sites || [])
     } catch {
-      setError("Network error. Please try again.")
+      setError({ message: "Network error. Please try again." })
     } finally {
       setLoading(false)
     }
@@ -34,7 +39,12 @@ export function ConnectSitePrompt() {
       </p>
 
       {error && (
-        <p className="mt-3 text-sm text-brand-accent">{error}</p>
+        <div className="mt-3 space-y-1">
+          <p className="text-sm font-medium text-brand-accent">{error.message}</p>
+          {error.detail && (
+            <p className="text-xs text-[#575858]">{error.detail}</p>
+          )}
+        </div>
       )}
 
       <button
