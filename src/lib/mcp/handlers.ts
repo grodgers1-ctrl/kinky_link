@@ -325,3 +325,125 @@ registerTool({
     return jsonResult(enriched)
   },
 })
+
+interface GscKeywordRow {
+  keyword: string
+  clicks: number
+  impressions: number
+  ctr: number
+  avg_position: number
+}
+
+function keywordOpportunity(row: GscKeywordRow): number {
+  return row.impressions * (1 / Math.max(row.avg_position, 1))
+}
+
+registerTool({
+  name: "find_quick_win_keywords",
+  description:
+    "Return keywords the caller's site is ranking for in Search Console, filtered to 'quick win' opportunities: position 11-30 with meaningful impressions. Sorted by opportunity score (impressions ÷ position). Use to answer 'what should I write about next?'",
+  inputSchema: {
+    type: "object",
+    properties: {
+      site_id: { type: "string", description: "UUID from list_campaigns' sites (or run list_sites first)" },
+      min_impressions: { type: "integer", minimum: 1, default: 10 },
+      position_min: { type: "number", minimum: 1, default: 11 },
+      position_max: { type: "number", minimum: 1, default: 30 },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+    },
+    required: ["site_id"],
+  },
+  handler: async (userId, args) => {
+    const siteId = String(args.site_id || "")
+    if (!siteId) return errorResult("site_id is required")
+
+    const { data: rows } = await supabaseAdmin
+      .from("keywords")
+      .select("keyword, clicks, impressions, ctr, avg_position")
+      .eq("user_id", userId)
+      .eq("site_id", siteId)
+      .eq("source", "gsc")
+
+    if (!rows || rows.length === 0) {
+      return jsonResult([])
+    }
+
+    const minImp = Number(args.min_impressions) || 10
+    const posMin = Number(args.position_min) || 11
+    const posMax = Number(args.position_max) || 30
+    const limit = Math.min(100, Math.max(1, Number(args.limit) || 20))
+
+    const filtered = (rows as GscKeywordRow[])
+      .filter((r) => r.impressions >= minImp && r.avg_position >= posMin && r.avg_position <= posMax)
+      .map((r) => ({ ...r, opportunity: keywordOpportunity(r) }))
+      .sort((a, b) => b.opportunity - a.opportunity)
+      .slice(0, limit)
+
+    return jsonResult(filtered)
+  },
+})
+
+registerTool({
+  name: "find_prospect_gaps",
+  description:
+    "Return prospects in a campaign that are missing a contact email, sorted by Domain Authority DESC. Use to answer 'which prospects should I run find_email on next?'",
+  inputSchema: {
+    type: "object",
+    properties: {
+      campaign_id: { type: "string" },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+    },
+    required: ["campaign_id"],
+  },
+  handler: async (userId, args) => {
+    const campaignId = String(args.campaign_id || "")
+    if (!campaignId) return errorResult("campaign_id is required")
+    const limit = Math.min(100, Math.max(1, Number(args.limit) || 20))
+
+    const { data } = await supabaseAdmin
+      .from("prospects")
+      .select("id, url, domain, title, domain_authority, status, created_at")
+      .eq("user_id", userId)
+      .eq("campaign_id", campaignId)
+      .or("email.is.null,email.eq.")
+      .order("domain_authority", { ascending: false, nullsFirst: false })
+      .limit(limit)
+
+    return jsonResult(data || [])
+  },
+})
+
+registerTool({
+  name: "list_lost_backlinks",
+  description:
+    "Return backlinks in unhealthy states (broken, unreachable, redirected). Use to answer 'what did I lose recently?' Combine with a since filter to scope to a time window.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      site_id: { type: "string" },
+      since: {
+        type: "string",
+        description: "ISO-8601 timestamp — only include backlinks whose last_health_check is after this",
+      },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+    },
+  },
+  handler: async (userId, args) => {
+    const limit = Math.min(100, Math.max(1, Number(args.limit) || 50))
+    let q = supabaseAdmin
+      .from("backlinks")
+      .select(
+        "id, site_id, source_url, target_url, anchor_text, first_seen, last_seen, is_indexed, health_status, last_health_check",
+      )
+      .eq("user_id", userId)
+      .in("health_status", ["broken", "unreachable", "redirected"])
+      .order("last_health_check", { ascending: false, nullsFirst: false })
+      .limit(limit)
+
+    if (args.site_id) q = q.eq("site_id", String(args.site_id))
+    if (args.since) q = q.gt("last_health_check", String(args.since))
+
+    const { data } = await q
+    return jsonResult(data || [])
+  },
+})

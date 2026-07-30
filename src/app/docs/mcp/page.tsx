@@ -12,6 +12,10 @@ const TOOLS = [
   { name: "list_prospects", description: "List prospects, filterable by campaign and status." },
   { name: "list_backlinks", description: "List backlinks earned to your sites." },
   { name: "list_replies", description: "List prospects who have replied to outreach." },
+  { name: "find_similar_prospects", description: "Given a known-good prospect URL, return semantically similar URLs via Exa.ai. Great for 'find me 20 more like this one.'" },
+  { name: "find_quick_win_keywords", description: "Return keywords ranking on GSC pages 2-3 with impressions — the striking-distance opportunities. Sorted by opportunity score." },
+  { name: "find_prospect_gaps", description: "Return prospects in a campaign that are missing a contact email, sorted by Domain Authority." },
+  { name: "list_lost_backlinks", description: "Return backlinks that are currently broken, unreachable, or redirected. Optionally filter by since date." },
 ]
 
 export default async function McpDocsPage() {
