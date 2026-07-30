@@ -2,6 +2,40 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { SupabaseAdapter } from "@/lib/supabase-adapter"
 
+async function refreshGoogleAccessToken(
+  refreshToken: string,
+): Promise<{ access_token: string; expires_at: number; refresh_token?: string } | null> {
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.AUTH_GOOGLE_ID!,
+        client_secret: process.env.AUTH_GOOGLE_SECRET!,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+    })
+    if (!res.ok) {
+      console.error("Google token refresh failed:", res.status, await res.text())
+      return null
+    }
+    const data = (await res.json()) as {
+      access_token: string
+      expires_in: number
+      refresh_token?: string
+    }
+    return {
+      access_token: data.access_token,
+      expires_at: Math.floor(Date.now() / 1000) + data.expires_in,
+      refresh_token: data.refresh_token,
+    }
+  } catch (error) {
+    console.error("Google token refresh error:", error)
+    return null
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   debug: true,
   adapter: SupabaseAdapter({
@@ -34,6 +68,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id as string | undefined
       }
+
+      const expiresAt = token.expiresAt as number | undefined
+      const refreshToken = token.refreshToken as string | undefined
+      const nowSec = Math.floor(Date.now() / 1000)
+      if (expiresAt && refreshToken && nowSec > expiresAt - 60) {
+        const refreshed = await refreshGoogleAccessToken(refreshToken)
+        if (refreshed) {
+          token.accessToken = refreshed.access_token
+          token.expiresAt = refreshed.expires_at
+          if (refreshed.refresh_token) token.refreshToken = refreshed.refresh_token
+          delete (token as { error?: string }).error
+        } else {
+          ;(token as { error?: string }).error = "RefreshAccessTokenError"
+        }
+      }
+
       return token
     },
     async session({ session, token }) {
