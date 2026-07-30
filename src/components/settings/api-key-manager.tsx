@@ -8,6 +8,30 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
   const [creating, setCreating] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [testResult, setTestResult] = useState<
+    | null
+    | { ok: true; toolCount: number; keyPrefix: string }
+    | { ok: false; error: string }
+  >(null)
+  const [testing, setTesting] = useState(false)
+
+  async function testConnection() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetch("/api/mcp/test", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) {
+        setTestResult({ ok: false, error: data.error || "Test failed" })
+      } else {
+        setTestResult({ ok: true, toolCount: data.toolCount, keyPrefix: data.keyPrefix })
+      }
+    } catch {
+      setTestResult({ ok: false, error: "Network error" })
+    } finally {
+      setTesting(false)
+    }
+  }
 
   async function create() {
     if (!name.trim()) return
@@ -95,6 +119,25 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
       <div className="rounded-lg border border-[#DCDDDE] bg-brand-white">
         <div className="border-b border-[#DCDDDE] px-5 py-3">
           <h2 className="text-h3 font-semibold text-brand-secondary">Your keys</h2>
+        </div>
+        <div className="border-b border-[#DCDDDE] px-5 py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={testConnection}
+              disabled={testing || keys.filter((k) => !k.revoked_at).length === 0}
+              className="rounded-lg border border-[#DCDDDE] bg-brand-surface px-3 py-1.5 text-xs font-medium text-brand-secondary hover:bg-[#DCDDDE] disabled:opacity-50"
+            >
+              {testing ? "Testing…" : "Test connection"}
+            </button>
+            {testResult && testResult.ok && (
+              <span className="text-xs text-[#166534]">
+                ✓ Connected. Key {testResult.keyPrefix}… &middot; {testResult.toolCount} tools available.
+              </span>
+            )}
+            {testResult && !testResult.ok && (
+              <span className="text-xs text-brand-accent">✗ {testResult.error}</span>
+            )}
+          </div>
         </div>
         {keys.length === 0 ? (
           <p className="p-5 text-sm text-[#575858]">No keys yet.</p>
