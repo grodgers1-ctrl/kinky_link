@@ -50,7 +50,7 @@ export function OnboardingWizard() {
       const res = await fetch("/api/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: campaignName, siteId: selectedSiteUrl || undefined }),
+        body: JSON.stringify({ name: campaignName, siteUrl: selectedSiteUrl || undefined }),
       })
       if (!res.ok) {
         const data = await res.json()
