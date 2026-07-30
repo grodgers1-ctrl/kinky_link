@@ -5,6 +5,13 @@ import Link from "next/link"
 
 const FEATURES = [
   {
+    title: "Works with your AI agent",
+    body: "First-class MCP server. Plug linklight into Claude Desktop, Claude Code, or Cursor and your agent can drive campaigns end-to-end. See docs.",
+    icon: (
+      <path d="M12 2 4 6v6c0 5 3.5 9.7 8 10 4.5-.3 8-5 8-10V6l-8-4Zm0 5a3 3 0 0 1 3 3v1h1v6H8v-6h1v-1a3 3 0 0 1 3-3Zm-1 4h2v-1a1 1 0 0 0-2 0v1Z" />
+    ),
+  },
+  {
     title: "Find prospects fast",
     body: "Keyword-to-SERP discovery with Moz DA baked in. Results are cached across accounts so common searches are instant.",
     icon: (
@@ -46,30 +53,23 @@ const FEATURES = [
       <path d="M10.6 13.4a5 5 0 0 1 0-7.07l3-3a5 5 0 0 1 7.07 7.08l-1.5 1.5-1.42-1.42 1.5-1.5a3 3 0 1 0-4.24-4.24l-3 3a3 3 0 0 0 0 4.24l-1.4 1.42ZM13.4 10.6a5 5 0 0 1 0 7.07l-3 3a5 5 0 1 1-7.07-7.08l1.5-1.5 1.42 1.42-1.5 1.5a3 3 0 1 0 4.24 4.24l3-3a3 3 0 0 0 0-4.24l1.4-1.42Z" />
     ),
   },
-  {
-    title: "Works with your AI agent",
-    body: "First-class MCP server. Plug linklight into Claude Desktop, Claude Code, or Cursor and your agent can drive campaigns end-to-end. See docs.",
-    icon: (
-      <path d="M12 2 4 6v6c0 5 3.5 9.7 8 10 4.5-.3 8-5 8-10V6l-8-4Zm0 5a3 3 0 0 1 3 3v1h1v6H8v-6h1v-1a3 3 0 0 1 3-3Zm-1 4h2v-1a1 1 0 0 0-2 0v1Z" />
-    ),
-  },
 ]
 
 const STEPS = [
   {
     n: "01",
-    title: "Connect Google",
-    body: "One sign-in gives us Search Console + Gmail send access. Skip the SMTP maze.",
+    title: "Connect your agent",
+    body: "Sign in, generate an API key, paste one snippet into Claude Desktop / Claude Code / Cursor. 60 seconds.",
   },
   {
     n: "02",
-    title: "Point us at a keyword",
-    body: "We pull the top-ranking sites, enrich them with DA and contact info, and drop them into a campaign.",
+    title: "Prompt the work",
+    body: "\"Find 20 SEO blog prospects, draft personalized outreach, save as drafts.\" The agent chains tools, you review.",
   },
   {
     n: "03",
-    title: "Draft, send, follow up",
-    body: "Write once, sequence it, and watch replies land in your inbox. Backlinks you earn show up automatically.",
+    title: "Approve and send",
+    body: "Every send needs your tap. Replies land in your Gmail. Backlinks show up in Search Console automatically.",
   },
 ]
 
@@ -133,36 +133,39 @@ export default async function Home() {
         <div className="grid items-center gap-12 md:grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-brand-accent">
-              Link building for indie operators
+              The MCP server for SEO
             </p>
             <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight text-brand-secondary sm:text-5xl">
-              Outreach that runs from your own inbox.
+              Give your AI agent backlink superpowers.
             </h1>
             <p className="mt-4 text-lg text-[#575858]">
-              Find the right prospects, draft the email, send it from Gmail, and
-              watch the backlinks show up in Search Console — all in one place.
-              No SMTP setup, no seat licenses, no bloat.
+              Plug linklight into Claude Desktop, Claude Code, or Cursor. Your agent
+              finds prospects, drafts outreach, and monitors backlinks — you approve
+              and send. Dashboard included, but the agent is the point.
             </p>
-            <ul className="mt-6 space-y-2 text-sm text-[#575858]">
-              {[
-                "Prospect discovery + DA in one search",
-                "AI drafts with a built-in spam score",
-                "Follow-ups that stop when someone replies",
-                "Backlink monitoring straight from GSC",
-              ].map((line) => (
-                <li key={line} className="flex items-start gap-2">
-                  <svg
-                    className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-accent"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
-                  </svg>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
+
+            <div className="mt-6 overflow-hidden rounded-xl border border-[#DCDDDE] bg-brand-secondary p-4 font-mono text-sm text-brand-white shadow-sm">
+              <div className="flex items-center gap-2 pb-3 text-xs text-[#8B8FBB]">
+                <span className="inline-block h-2 w-2 rounded-full bg-brand-accent" />
+                <span>Claude</span>
+              </div>
+              <p><span className="text-[#8B8FBB]">&gt;</span> Find 20 SaaS directories for indie tools</p>
+              <p className="mt-1 text-brand-primary">&#10003; 20 prospects added to campaign &ldquo;Q4 launch&rdquo;</p>
+              <p className="mt-3"><span className="text-[#8B8FBB]">&gt;</span> Draft personalised outreach for each</p>
+              <p className="mt-1 text-brand-primary">&#10003; 20 drafts ready — average spam score A</p>
+              <p className="mt-3"><span className="text-[#8B8FBB]">&gt;</span> Track approvals</p>
+              <p className="mt-1 text-brand-primary">&#10003; Monitoring inbox for replies</p>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-4 text-sm">
+              <Link
+                href="/docs/mcp"
+                className="rounded-lg bg-brand-accent px-4 py-2 font-medium text-white hover:opacity-90"
+              >
+                Get your MCP endpoint &rarr;
+              </Link>
+              <span className="text-[#575858]">or sign in for the dashboard →</span>
+            </div>
           </div>
 
           <div id="signin" className="mx-auto w-full max-w-md">
@@ -256,10 +259,10 @@ export default async function Home() {
       <section className="border-t border-[#DCDDDE] bg-brand-primary">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-6 py-12 text-center">
           <h2 className="text-2xl font-semibold text-brand-secondary">
-            Ready to earn your next link?
+            Ready to give your agent the job?
           </h2>
           <p className="max-w-lg text-sm text-[#575858]">
-            Sign in with Google and you&apos;ll have a campaign running in under two minutes.
+            Sign in, get your MCP endpoint, and your agent can be building links inside two minutes.
           </p>
           <div className="mt-2 w-full max-w-xs">
             <SignInButton session={null} />
