@@ -3,6 +3,7 @@ import { getSerpForKeyword, getDomainFacts } from "@/lib/corpus"
 import { hunterFindEmail } from "@/lib/hunter"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
 import { scoreEmail } from "@/lib/spam-score"
+import { exaFindSimilar } from "@/lib/exa"
 import { registerTool, jsonResult, errorResult } from "./tools"
 
 registerTool({
@@ -284,5 +285,43 @@ registerTool({
       .eq("user_id", userId)
     if (error) return errorResult(`Failed to save draft: ${error.message}`)
     return jsonResult({ ok: true, prospect_id: prospectId, saved_at: stamp })
+  },
+})
+
+registerTool({
+  name: "find_similar_prospects",
+  description:
+    "Given a known-good prospect URL, return semantically similar URLs via Exa.ai's neural search. Use this when the caller already has one great prospect and wants 5-20 more like it. Excludes the source domain by default.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      url: {
+        type: "string",
+        description: "The reference URL (e.g. https://backlinko.com/link-building-tools)",
+      },
+      limit: { type: "integer", minimum: 1, maximum: 50, default: 10 },
+    },
+    required: ["url"],
+  },
+  handler: async (_userId, args) => {
+    const url = String(args.url || "").trim()
+    if (!url) return errorResult("url is required")
+    try {
+      new URL(url)
+    } catch {
+      return errorResult(`Invalid URL: ${url}`)
+    }
+    const limit = Math.min(50, Math.max(1, Number(args.limit) || 10))
+    const results = await exaFindSimilar(url, { numResults: limit })
+    const enriched = results.map((r) => {
+      let domain = ""
+      try {
+        domain = new URL(r.url).hostname.replace(/^www\./, "")
+      } catch {
+        // fall through
+      }
+      return { url: r.url, title: r.title, score: r.score, domain }
+    })
+    return jsonResult(enriched)
   },
 })
