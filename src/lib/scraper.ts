@@ -1,4 +1,7 @@
-import * as cheerio from "cheerio"
+// Tavily Search API — https://docs.tavily.com/
+// Free tier: 1,000 searches/month. Same interface as the previous Google-HTML
+// scraper so callers (corpus, MCP search_prospects, keyword-service) don't
+// need to change.
 
 interface ProspectResult {
   url: string
@@ -7,41 +10,73 @@ interface ProspectResult {
   domain: string
 }
 
+interface TavilyResult {
+  url: string
+  title: string
+  content?: string
+  score?: number
+  raw_content?: string | null
+}
+
+interface TavilyResponse {
+  results?: TavilyResult[]
+  answer?: string | null
+  query?: string
+  response_time?: number
+}
+
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY
+
 export async function scrapeSerp(keyword: string): Promise<ProspectResult[]> {
-  const url = `https://www.google.com/search?q=${encodeURIComponent(keyword)}&num=20`
+  if (!TAVILY_API_KEY) {
+    console.warn("scrapeSerp: TAVILY_API_KEY not configured — returning [].")
+    return []
+  }
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  })
+  try {
+    const res = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: TAVILY_API_KEY,
+        query: keyword,
+        max_results: 20,
+        search_depth: "basic",
+        include_answer: false,
+        include_raw_content: false,
+      }),
+    })
 
-  const html = await response.text()
-  const $ = cheerio.load(html)
-  const results: ProspectResult[] = []
+    if (!res.ok) {
+      const body = await res.text()
+      console.error("Tavily fetch failed:", res.status, body.slice(0, 300))
+      return []
+    }
 
-  $("div.g").each((_, el) => {
-    const titleEl = $(el).find("h3")
-    const linkEl = $(el).find("a")
-    const snippetEl = $(el).find("div[data-sncf], span.aCOpRe, div.VwiC3b")
+    const data = (await res.json()) as TavilyResponse
+    const items = data.results || []
+    const results: ProspectResult[] = []
 
-    const title = titleEl.text().trim()
-    const href = linkEl.attr("href") || ""
-    const description = snippetEl.text().trim()
-
-    const urlMatch = href.match(/\/url\?q=([^&]+)/) || href.match(/^https?:\/\/[^&]+/)
-    const rawUrl = urlMatch ? decodeURIComponent(urlMatch[1]) : href
-
-    if (rawUrl && title) {
+    for (const item of items) {
+      const url = item.url
+      const title = item.title?.trim() || ""
+      if (!url || !title) continue
       try {
-        const domain = new URL(rawUrl).hostname.replace("www.", "")
-        results.push({ url: rawUrl, title, description, domain })
+        const domain = new URL(url).hostname.replace(/^www\./, "")
+        results.push({
+          url,
+          title,
+          description: item.content?.trim() || "",
+          domain,
+        })
       } catch {
         // skip malformed URLs
       }
     }
-  })
 
-  return results
+    return results
+  } catch (error) {
+    console.error("Tavily fetch error:", error)
+    return []
+  }
 }
