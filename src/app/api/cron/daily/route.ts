@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const results: Record<string, any> = {}
+  const results: Record<string, unknown> = {}
 
   // --- PART 1: SEND DUE FOLLOW-UPS ---
   try {
@@ -166,22 +166,34 @@ export async function GET(req: NextRequest) {
 
     const { data: staleBacklinks } = await supabaseAdmin
       .from("backlinks")
-      .select("id, source_url, user_id")
+      .select("id, source_url, user_id, health_status")
       .or(`last_health_check.is.null,last_health_check.lte.${sevenDaysAgo}`)
       .limit(200)
 
     if (staleBacklinks && staleBacklinks.length > 0) {
+      const badStatuses = new Set(["broken", "unreachable", "redirected"])
       let broken = 0
+      let unreachable = 0
+      let redirected = 0
       let healthy = 0
+      let notified = 0
 
       for (const bl of staleBacklinks) {
         try {
           const result = await checkSingleUrl(bl.source_url)
           const healthStatus = determineHealth(result)
 
+          const priorStatus = bl.health_status || "pending"
+          const isTransitionToBad =
+            badStatuses.has(healthStatus) && !badStatuses.has(priorStatus)
+
           await supabaseAdmin
             .from("backlinks")
-            .update({ health_status: healthStatus, last_health_check: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .update({
+              health_status: healthStatus,
+              last_health_check: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
             .eq("id", bl.id)
 
           await supabaseAdmin.from("backlink_history").insert({
@@ -189,24 +201,39 @@ export async function GET(req: NextRequest) {
             health_status: healthStatus,
           })
 
-          if (healthStatus === "broken") {
-            broken++
+          if (healthStatus === "broken") broken++
+          else if (healthStatus === "unreachable") unreachable++
+          else if (healthStatus === "redirected") redirected++
+          else if (healthStatus === "healthy") healthy++
+
+          if (isTransitionToBad) {
+            notified++
+            const titleByStatus: Record<string, string> = {
+              broken: "Backlink broken",
+              unreachable: "Backlink unreachable",
+              redirected: "Backlink redirected",
+            }
             await supabaseAdmin.from("notifications").insert({
               user_id: bl.user_id,
-              type: "info",
-              title: "Broken backlink detected",
-              body: `${bl.source_url} is broken`,
+              type: "warning",
+              title: titleByStatus[healthStatus] || "Backlink lost",
+              body: `${bl.source_url} is ${healthStatus}`,
               link: `/dashboard/backlinks/${bl.id}`,
             })
-          } else if (healthStatus === "healthy") {
-            healthy++
           }
         } catch {
           // individual failure shouldn't block the batch
         }
       }
 
-      results.healthCheck = { checked: staleBacklinks.length, broken, healthy }
+      results.healthCheck = {
+        checked: staleBacklinks.length,
+        broken,
+        unreachable,
+        redirected,
+        healthy,
+        notified,
+      }
     } else {
       results.healthCheck = { checked: 0 }
     }
