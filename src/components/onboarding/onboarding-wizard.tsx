@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 
@@ -27,23 +27,30 @@ export function OnboardingWizard() {
   const [creatingKey, setCreatingKey] = useState(false)
   const router = useRouter()
 
-  const fetchSites = useCallback(async () => {
-    try {
-      const res = await fetch("/api/sites")
-      const data = await res.json()
-      const list = (data.sites || []).map((s: { siteUrl?: string; url?: string }) => ({
-        url: s.siteUrl || s.url || "",
-      }))
-      setSites(list)
-      if (list.length > 0) setSelectedSiteUrl(list[0].url)
-    } catch {
-      setError("Failed to load sites")
-    }
-  }, [])
-
   useEffect(() => {
-    if (step === 3) fetchSites()
-  }, [step, fetchSites])
+    if (step !== 3) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch("/api/sites")
+        const data = await res.json()
+        const list = (data.sites || []).map(
+          (s: { siteUrl?: string; url?: string }) => ({
+            url: s.siteUrl || s.url || "",
+          }),
+        )
+        if (cancelled) return
+        setSites(list)
+        if (list.length > 0) setSelectedSiteUrl(list[0].url)
+      } catch {
+        if (!cancelled) setError("Failed to load sites")
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [step])
 
   const nextStep = () => { setStep(s => Math.min(s + 1, STEPS.length - 1)); setError("") }
   const prevStep = () => { setStep(s => Math.max(s - 1, 0)); setError("") }
