@@ -3,6 +3,7 @@ import { getDomainFacts, getProspectsForKeyword, getCompetitorBacklinks } from "
 import { findEmailAcrossProviders } from "@/lib/email-cascade"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
 import { scoreEmail } from "@/lib/spam-score"
+import { fetchProspectContext } from "@/lib/prospect-context"
 import { exaFindSimilar } from "@/lib/exa"
 import { registerTool, jsonResult, errorResult } from "./tools"
 
@@ -227,7 +228,7 @@ registerTool({
 registerTool({
   name: "draft_email",
   description:
-    "Generate an outreach email draft. Returns subject, HTML body, plain-text body, and a spam score (0-10, higher = better).",
+    "Generate an outreach email draft. Returns subject, HTML body, plain-text body, and a spam score (0-10, higher = better). Pass prospect_url to fetch the target's page and personalize the draft with a reference to their actual content — this dramatically improves reply rate over generic drafts.",
   inputSchema: {
     type: "object",
     properties: {
@@ -235,6 +236,11 @@ registerTool({
       article_title: { type: "string", description: "Their article being referenced (optional)" },
       site_name: { type: "string" },
       prospect_name: { type: "string" },
+      prospect_url: {
+        type: "string",
+        description:
+          "Optional. If provided, the tool fetches this URL and uses its title + first paragraph to personalize the draft. Best URL is the specific post you want to reference; the homepage works too.",
+      },
       tone: {
         type: "string",
         enum: ["friendly", "professional", "direct"],
@@ -250,11 +256,27 @@ registerTool({
         `Daily AI writing limit reached. Remaining: ${getAiUsageRemaining(userId)}`,
       )
     }
+
+    let articleTitle = args.article_title ? String(args.article_title) : undefined
+    let recentSnippet: string | undefined
+    let contextSource: string | null = null
+
+    const prospectUrl = args.prospect_url ? String(args.prospect_url).trim() : ""
+    if (prospectUrl) {
+      const context = await fetchProspectContext(prospectUrl)
+      if (context) {
+        contextSource = context.url
+        if (!articleTitle && context.title) articleTitle = context.title
+        recentSnippet = context.snippet || context.description || undefined
+      }
+    }
+
     const draft = await generateEmailDraft({
       topic: String(args.topic),
-      articleTitle: args.article_title ? String(args.article_title) : undefined,
+      articleTitle,
       siteName: args.site_name ? String(args.site_name) : undefined,
       prospectName: args.prospect_name ? String(args.prospect_name) : undefined,
+      recentSnippet,
       tone:
         (args.tone as "friendly" | "professional" | "direct" | undefined) ||
         "friendly",
@@ -272,7 +294,13 @@ registerTool({
       bodyHtml: draft.bodyHtml,
       bodyText: draft.bodyText,
     })
-    return jsonResult({ draft, spamScore, remaining: getAiUsageRemaining(userId) })
+    return jsonResult({
+      draft,
+      spamScore,
+      personalized: recentSnippet ? true : false,
+      contextSource,
+      remaining: getAiUsageRemaining(userId),
+    })
   },
 })
 

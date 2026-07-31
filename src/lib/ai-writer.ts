@@ -96,7 +96,7 @@ Keep the body under 150 words. If you referenced their recent work, do it once, 
       bodyHtml,
       bodyText,
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("AI write error:", error)
     throw new Error("Failed to generate email draft")
   }
