@@ -12,6 +12,14 @@ export function buildProspectQuery(keyword: string): string {
   return `"${keyword}" resources OR tools OR sites OR directory OR recommended OR list OR roundup OR "best" OR "top"`
 }
 
+export function buildCompetitorBacklinkQuery(competitor: string): string {
+  const bare = competitor
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .replace(/^www\./, "")
+  return `"${bare}" roundup OR "best of" OR "alternatives to" OR list OR review OR "vs"`
+}
+
 function isLikelyCompetitor(domain: string, keyword: string): boolean {
   const bare = keyword.toLowerCase().replace(/\s+/g, "")
   if (bare.length < 4) return false
@@ -208,6 +216,58 @@ export async function getProspectsForKeyword(
   })
 
   const chosen = linkable.length > 0 ? linkable : raw
+
+  const domains = Array.from(new Set(chosen.map((r) => r.domain)))
+  const facts = await getDomainFacts(domains)
+
+  return chosen.map((r, i) => ({
+    url: r.url,
+    title: r.title,
+    description: r.description,
+    domain: r.domain,
+    domainAuthority: facts[r.domain]?.domain_authority ?? null,
+    position: i,
+  }))
+}
+
+export interface CompetitorBacklink {
+  url: string
+  title: string
+  description: string
+  domain: string
+  domainAuthority: number | null
+  position: number | null
+}
+
+/**
+ * Find pages linking to (or featuring) a competitor in roundup/list/alternatives
+ * articles — the "who could realistically link to me" outreach list. Drops the
+ * competitor's own domain and any caller-provided excludeDomains before enriching.
+ */
+export async function getCompetitorBacklinks(opts: {
+  competitor: string
+  excludeDomains?: string[]
+  limit?: number
+}): Promise<CompetitorBacklink[]> {
+  const competitorDomain = opts.competitor
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .replace(/^www\./, "")
+    .toLowerCase()
+
+  const query = buildCompetitorBacklinkQuery(competitorDomain)
+  const raw = await scrapeSerp(query)
+  if (raw.length === 0) return []
+
+  const exclude = new Set(
+    [competitorDomain, ...(opts.excludeDomains || [])].map((d) => d.toLowerCase()),
+  )
+
+  const filtered = raw.filter((r) => !exclude.has(r.domain.toLowerCase()))
+  if (filtered.length === 0) return []
+
+  const limit = Math.min(50, Math.max(1, opts.limit || 20))
+  const chosen = filtered.slice(0, limit)
 
   const domains = Array.from(new Set(chosen.map((r) => r.domain)))
   const facts = await getDomainFacts(domains)
