@@ -18,6 +18,7 @@ interface AiDraftParams {
   articleTitle?: string
   siteName?: string
   prospectName?: string
+  recentSnippet?: string
   tone: "friendly" | "professional" | "direct"
   campaignType: "outreach" | "guest_post" | "resource_page" | "skyscraper" | "link_reclamation"
 }
@@ -44,6 +45,10 @@ export async function generateEmailDraft(params: AiDraftParams): Promise<{
   const campaignInstructions = CAMPAIGN_PROMPTS[params.campaignType] || CAMPAIGN_PROMPTS.outreach
   const systemPrompt = SYSTEM_PROMPTS[params.tone] || SYSTEM_PROMPTS.friendly
 
+  const contextBlock = params.recentSnippet
+    ? `\nSomething they recently published (reference this naturally, do not quote verbatim):\n${params.recentSnippet}\n`
+    : ""
+
   const userPrompt = `Write a link building outreach email.
 
 Context:
@@ -51,7 +56,7 @@ Context:
 - Their article title: ${params.articleTitle || "(not specified)"}
 - Your site name: ${params.siteName || "(your website)"}
 - Recipient name: ${params.prospectName || "(unknown)"}
-
+${contextBlock}
 Campaign type: ${params.campaignType}
 Instructions: ${campaignInstructions}
 
@@ -61,7 +66,7 @@ Format your response as JSON with two fields:
   "body": "The email body as plain text, suitable for both HTML and text versions. Use {{first_name}}, {{site_name}} etc. as merge tags where appropriate."
 }
 
-Keep the body under 150 words. Do not use markdown formatting.`
+Keep the body under 150 words. If you referenced their recent work, do it once, naturally, in the opening. Do not use markdown formatting.`
 
   try {
     const response = await getOpenai().chat.completions.create({
