@@ -6,6 +6,18 @@ const SERP_TTL_DAYS = 30
 const DA_TTL_DAYS = 90
 const MIN_CACHED_RESULTS = 10
 
+const LINKABLE_TITLE_RE = /2024|2025|2026|best|top|review|vs|alternative|guide|resources|list|roundup|tools|directory|recommended|ultimate|complete/i
+
+export function buildProspectQuery(keyword: string): string {
+  return `"${keyword}" resources OR tools OR sites OR directory OR recommended OR list OR roundup OR "best" OR "top"`
+}
+
+function isLikelyCompetitor(domain: string, keyword: string): boolean {
+  const bare = keyword.toLowerCase().replace(/\s+/g, "")
+  if (bare.length < 4) return false
+  return domain.toLowerCase().includes(bare)
+}
+
 export interface CorpusProspect {
   url: string
   title: string | null
@@ -156,4 +168,56 @@ async function bumpSeenCount(domains: string[]) {
     onConflict: "domain",
     ignoreDuplicates: false,
   })
+}
+
+export interface ProspectForKeyword {
+  url: string
+  title: string
+  description: string
+  domain: string
+  domainAuthority: number | null
+  position: number | null
+}
+
+/**
+ * Fetch prospects for a keyword using the roundup/list-focused query.
+ * Prefers linkable pages (roundups, guides, resource pages) over direct
+ * competitor product pages. Cache-first: uses corpus for the plain keyword,
+ * falls back to a live Tavily call with the enhanced query on miss.
+ */
+export async function getProspectsForKeyword(
+  keyword: string,
+): Promise<ProspectForKeyword[]> {
+  const enhancedQuery = buildProspectQuery(keyword)
+  let raw = await scrapeSerp(enhancedQuery)
+
+  if (raw.length === 0) {
+    const cached = await getSerpForKeyword(keyword)
+    raw = cached.map((r) => ({
+      url: r.url,
+      title: r.title || "",
+      description: r.description || "",
+      domain: r.domain,
+    }))
+  }
+
+  const linkable = raw.filter((r) => {
+    const looksLinkable = LINKABLE_TITLE_RE.test(r.title)
+    const looksCompetitor = isLikelyCompetitor(r.domain, keyword)
+    return looksLinkable || !looksCompetitor
+  })
+
+  const chosen = linkable.length > 0 ? linkable : raw
+
+  const domains = Array.from(new Set(chosen.map((r) => r.domain)))
+  const facts = await getDomainFacts(domains)
+
+  return chosen.map((r, i) => ({
+    url: r.url,
+    title: r.title,
+    description: r.description,
+    domain: r.domain,
+    domainAuthority: facts[r.domain]?.domain_authority ?? null,
+    position: i,
+  }))
 }

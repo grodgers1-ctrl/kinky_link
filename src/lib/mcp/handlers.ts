@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/db"
-import { getSerpForKeyword, getDomainFacts } from "@/lib/corpus"
+import { getSerpForKeyword, getDomainFacts, getProspectsForKeyword } from "@/lib/corpus"
 import { hunterFindEmail } from "@/lib/hunter"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
 import { scoreEmail } from "@/lib/spam-score"
@@ -9,7 +9,7 @@ import { registerTool, jsonResult, errorResult } from "./tools"
 registerTool({
   name: "search_prospects",
   description:
-    "Find prospect sites for a keyword. Uses the shared SERP cache when fresh; scrapes Google on miss. Returns url, title, domain, position, and Moz Domain Authority.",
+    "Find link-building prospect sites for a keyword. Prefers roundup / list / resource-page targets over direct competitor product pages. Uses the shared SERP cache when fresh; hits Tavily on miss. Returns url, title, domain, position, and Moz Domain Authority.",
   inputSchema: {
     type: "object",
     properties: {
@@ -23,7 +23,7 @@ registerTool({
     if (!keyword) return errorResult("keyword is required")
     if (keyword.length > 200) return errorResult("keyword too long")
     const limit = Math.min(20, Math.max(1, Number(args.limit) || 10))
-    const results = await getSerpForKeyword(keyword)
+    const results = await getProspectsForKeyword(keyword)
     return jsonResult(results.slice(0, limit))
   },
 })
