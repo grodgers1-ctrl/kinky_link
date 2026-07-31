@@ -1,8 +1,10 @@
 # linklight
 
-**The MCP server for SEO.** Plug linklight into Claude Desktop, Claude Code, or Cursor and let your AI agent find prospects, draft outreach, and monitor backlinks — you approve and send.
+**The MCP server for SEO.** Plug linklight into Claude Desktop, Claude Code, Cursor, or any MCP client and let your AI agent find prospects, draft outreach, and monitor backlinks — you approve and send.
 
 Dashboard included. But the agent is the point.
+
+![linklight demo](demos/lightlinks-screencast.gif)
 
 ---
 
@@ -33,6 +35,7 @@ Full docs: **[lightlinks.dev/docs/mcp](https://lightlinks.dev/docs/mcp)**.
 | Tool | What it does |
 |---|---|
 | `search_prospects(keyword)` | Find prospect sites for a topic (Tavily-backed, DA-enriched) |
+| `find_competitor_backlinks(competitor_domain)` | Find pages linking to a competitor in roundups/alternatives lists — pass `my_domain` to get only NEW opportunities |
 | `find_similar_prospects(url)` | Given one good prospect, return 20 more like it (Exa.ai neural search) |
 | `enrich_domain(domain)` | DA + contact email + homepage title/description |
 | `find_email(domain)` | Look up a contact email (Hunter) |
@@ -54,6 +57,11 @@ save each draft against the prospect, and show me the spam scores.
 ```
 
 ```
+Who links to ahrefs.com in roundups or "best of" articles?
+Exclude domains that already link to my site, and give me the top 15 by DA.
+```
+
+```
 List my lost backlinks from the past 30 days, group by domain,
 and tell me which ones are worth reaching out to.
 ```
@@ -65,7 +73,7 @@ on the top 10 by domain authority.
 
 ## Pricing
 
-$12.99/mo. 7-day free trial, no credit card required.
+$19/mo. 7-day free trial, no credit card required.
 
 ## Under the hood
 
@@ -76,6 +84,17 @@ $12.99/mo. 7-day free trial, no credit card required.
 - Exa.ai for semantic prospect discovery
 - OpenAI for email drafting
 - Moz + Hunter for enrichment
+
+## MCP directories
+
+- [MCP Servers (official registry)](https://github.com/modelcontextprotocol/servers)
+- [mcp.so](https://mcp.so)
+- [Glama MCP Directory](https://glama.ai/mcp/servers)
+- [Smithery](https://smithery.ai)
+- [PulseMCP](https://www.pulsemcp.com)
+- [MCP Market](https://mcpmarket.com)
+
+See [docs/mcp/directory-submission.md](docs/mcp/directory-submission.md) for ready-to-paste listing details.
 
 ## License
 
