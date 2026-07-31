@@ -4,7 +4,7 @@
 
 Dashboard included. But the agent is the point.
 
-![linklight demo](demos/lightlinks-screencast.gif)
+![linklight demo](public/demos/lightlinks-screencast.gif)
 
 ---
 
