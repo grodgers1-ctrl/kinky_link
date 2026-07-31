@@ -11,10 +11,18 @@ const statusColors: Record<string, string> = {
   archived: "bg-zinc-100 text-zinc-500",
 }
 
-function DABadge({ da }: { da: number | null | undefined }) {
+function DABadge({ da, isFallback }: { da: number | null | undefined; isFallback: boolean }) {
   if (da == null) return <span className="text-xs text-[#999999]">—</span>
   const color = da > 30 ? "bg-green-100 text-green-700" : da > 20 ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"
-  return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{da}</span>
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
+      title={isFallback ? "Derived from domain_facts cache" : undefined}
+    >
+      {da}
+      {isFallback && <span className="ml-1 opacity-60">·</span>}
+    </span>
+  )
 }
 
 export function ProspectRow({
@@ -105,19 +113,38 @@ export function ProspectRow({
             autoFocus
           />
         ) : (
-          <span onClick={() => !saving && setEditing(true)} className="cursor-pointer hover:text-brand-accent">
-            {prospect.title || "—"}
+          <span
+            onClick={() => !saving && setEditing(true)}
+            title={prospect.homepageDescription || undefined}
+            className="cursor-pointer hover:text-brand-accent"
+          >
+            {prospect.title || prospect.homepageTitle || "—"}
+            {!prospect.title && prospect.homepageTitle && (
+              <span className="ml-1 text-[10px] uppercase tracking-wider text-[#999999]">cache</span>
+            )}
           </span>
         )}
       </td>
-      <td className="px-4 py-3"><DABadge da={prospect.domain_authority} /></td>
       <td className="px-4 py-3">
-        {prospect.email ? (
+        <DABadge
+          da={prospect.resolvedDA ?? prospect.domain_authority}
+          isFallback={prospect.domain_authority == null && prospect.resolvedDA != null}
+        />
+      </td>
+      <td className="px-4 py-3">
+        {(prospect.email || prospect.resolvedEmail) ? (
           <span className="flex items-center gap-1">
-            <span className="truncate text-sm">{prospect.email}</span>
+            <span className="truncate text-sm">
+              {prospect.email || prospect.resolvedEmail}
+            </span>
+            {!prospect.email && prospect.resolvedEmail && (
+              <span className="rounded-full bg-brand-primary px-1.5 py-0.5 text-[10px] text-brand-secondary" title="Shared cache — click Find Email to persist on this prospect">
+                cache
+              </span>
+            )}
             {prospect.email_verified ? (
               <span className="inline-flex rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">&#10003;</span>
-            ) : (
+            ) : prospect.email ? (
               <button
                 onClick={handleVerify}
                 disabled={verifying}
@@ -125,7 +152,7 @@ export function ProspectRow({
               >
                 {verifying ? "..." : "Verify"}
               </button>
-            )}
+            ) : null}
           </span>
         ) : (
           <button

@@ -43,6 +43,12 @@ export interface Prospect {
   pipeline_order: number
   created_at: string
   updated_at: string
+  // Enrichment from domain_facts (populated by GET /api/prospects; may be absent
+  // on other endpoints)
+  homepageTitle?: string | null
+  homepageDescription?: string | null
+  resolvedEmail?: string | null
+  resolvedDA?: number | null
 }
 
 export interface CampaignWithSite extends Campaign {

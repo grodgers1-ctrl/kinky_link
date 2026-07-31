@@ -28,7 +28,43 @@ export async function GET(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    return NextResponse.json({ prospects: data || [] })
+
+    const prospects = data || []
+    const domains = Array.from(
+      new Set(prospects.map((p) => p.domain).filter((d): d is string => !!d)),
+    )
+
+    const factsByDomain: Record<
+      string,
+      { title: string | null; description: string | null; contact_email: string | null; domain_authority: number | null }
+    > = {}
+    if (domains.length > 0) {
+      const { data: facts } = await supabaseAdmin
+        .from("domain_facts")
+        .select("domain, title, description, contact_email, domain_authority")
+        .in("domain", domains)
+      for (const f of facts || []) {
+        factsByDomain[f.domain] = {
+          title: f.title,
+          description: f.description,
+          contact_email: f.contact_email,
+          domain_authority: f.domain_authority,
+        }
+      }
+    }
+
+    const enriched = prospects.map((p) => {
+      const facts = p.domain ? factsByDomain[p.domain] : undefined
+      return {
+        ...p,
+        homepageTitle: facts?.title ?? null,
+        homepageDescription: facts?.description ?? null,
+        resolvedEmail: p.email ?? facts?.contact_email ?? null,
+        resolvedDA: p.domain_authority ?? facts?.domain_authority ?? null,
+      }
+    })
+
+    return NextResponse.json({ prospects: enriched })
   } catch (error) {
     console.error("Prospects list error:", error)
     return NextResponse.json({ error: "Failed to load prospects" }, { status: 500 })
