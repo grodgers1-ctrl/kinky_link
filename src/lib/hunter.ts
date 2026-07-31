@@ -1,11 +1,9 @@
+import type { EmailProvider, ProviderResult } from "./email-providers/types"
+
 const HUNTER_API_KEY = process.env.HUNTER_API_KEY
 
-export interface HunterResult {
-  email: string | null
-  confidence: string | null
-  source: string | null
-  error?: "not_configured" | "rate_limited" | "upstream_error"
-}
+// Backwards-compatible alias — nothing new should import this; use hunterProvider.
+export type HunterResult = ProviderResult
 
 interface HunterEmailRow {
   value?: string
@@ -13,7 +11,7 @@ interface HunterEmailRow {
   type?: string
 }
 
-export async function hunterFindEmail(domain: string): Promise<HunterResult> {
+export async function hunterFindEmail(domain: string): Promise<ProviderResult> {
   if (!HUNTER_API_KEY) {
     return { email: null, confidence: null, source: null, error: "not_configured" }
   }
@@ -31,14 +29,20 @@ export async function hunterFindEmail(domain: string): Promise<HunterResult> {
     const data = await response.json()
     const emails = (data?.data?.emails || []) as HunterEmailRow[]
 
-    if (emails.length === 0) return { email: null, confidence: null, source: null }
+    if (emails.length === 0) {
+      return { email: null, confidence: null, source: null, error: "not_found" }
+    }
 
     const generalEmails = emails.filter((e) => e.type === "generic" || e.type === "unknown")
     const personalEmails = emails.filter((e) => e.type === "personal")
     const best = generalEmails[0] || personalEmails[0] || emails[0]
 
+    if (!best.value) {
+      return { email: null, confidence: null, source: null, error: "not_found" }
+    }
+
     return {
-      email: best.value || null,
+      email: best.value,
       confidence: best.confidence || null,
       source: "hunter",
     }
@@ -46,6 +50,11 @@ export async function hunterFindEmail(domain: string): Promise<HunterResult> {
     console.error("Hunter.io error:", error)
     return { email: null, confidence: null, source: null, error: "upstream_error" }
   }
+}
+
+export const hunterProvider: EmailProvider = {
+  name: "hunter",
+  find: hunterFindEmail,
 }
 
 export async function hunterVerifyEmail(email: string): Promise<{
