@@ -9,6 +9,7 @@ interface ContactOutProfile {
 
 interface ContactOutResponse {
   profiles?: Record<string, ContactOutProfile>
+  metadata?: { total_results?: number }
 }
 
 async function findEmail(domain: string): Promise<ProviderResult> {
@@ -17,16 +18,19 @@ async function findEmail(domain: string): Promise<ProviderResult> {
   }
 
   try {
-    // ContactOut's domain search is a Sales-tier feature. On free/starter plans this
-    // typically returns 402 Payment Required or 403; map both to not_configured so
-    // the cascade skips silently until the caller upgrades.
+    // ContactOut's people search returns profiles matching a domain, then requires
+    // "reveal" credits to expose emails. On the free tier, profiles come back with
+    // empty work_email/personal_email arrays even when they exist. We treat that as
+    // not_configured so the cascade skips gracefully until the caller upgrades.
     const response = await fetch(
-      `https://api.contactout.com/v1/domain_search?domain=${encodeURIComponent(domain)}&page=1`,
+      "https://api.contactout.com/v1/people/search",
       {
+        method: "POST",
         headers: {
           token: CONTACTOUT_API_KEY,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ domain: [domain], reveal_info: true, page: 1 }),
       },
     )
 
@@ -48,6 +52,13 @@ async function findEmail(domain: string): Promise<ProviderResult> {
       if (email) {
         return { email, confidence: null, source: "contactout" }
       }
+    }
+
+    // Free-tier gating: profiles exist for this domain but no emails were revealed.
+    // Distinguish from "domain has no profiles at all".
+    const totalResults = data.metadata?.total_results ?? 0
+    if (totalResults > 0 && profiles.length > 0) {
+      return { email: null, confidence: null, source: null, error: "not_configured" }
     }
 
     return { email: null, confidence: null, source: null, error: "not_found" }
