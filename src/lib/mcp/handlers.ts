@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/db"
-import { getDomainFacts, getProspectsForKeyword } from "@/lib/corpus"
+import { getDomainFacts, getProspectsForKeyword, getCompetitorBacklinks } from "@/lib/corpus"
 import { findEmailAcrossProviders } from "@/lib/email-cascade"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
 import { scoreEmail } from "@/lib/spam-score"
@@ -475,5 +475,72 @@ registerTool({
 
     const { data } = await q
     return jsonResult(data || [])
+  },
+})
+
+registerTool({
+  name: "find_competitor_backlinks",
+  description:
+    "Return pages that link to or feature a competitor in roundups / lists / alternatives / vs. articles — the classic 'who could realistically link to me if they link to my competitor' list. Optionally excludes domains that already link to my_domain (pass my_domain to get only NEW opportunities). Returns url, title, domain, position, and Moz Domain Authority.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      competitor_domain: {
+        type: "string",
+        description: "The competitor's domain, e.g. 'ahrefs.com'. Scheme and www. prefixes are stripped.",
+      },
+      my_domain: {
+        type: "string",
+        description:
+          "Optional. If provided, domains that already appear as source_url on the caller's backlinks are filtered out so results are only NEW opportunities.",
+      },
+      limit: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+    },
+    required: ["competitor_domain"],
+  },
+  handler: async (userId, args) => {
+    const competitor = String(args.competitor_domain || "").trim()
+    if (!competitor) return errorResult("competitor_domain is required")
+
+    const limit = Math.min(50, Math.max(1, Number(args.limit) || 20))
+    const myDomain = String(args.my_domain || "")
+      .trim()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/.*$/, "")
+      .replace(/^www\./, "")
+      .toLowerCase()
+
+    let excludeDomains: string[] = []
+    if (myDomain) {
+      const { data: existing } = await supabaseAdmin
+        .from("backlinks")
+        .select("source_url")
+        .eq("user_id", userId)
+
+      const domains = new Set<string>()
+      for (const row of existing || []) {
+        if (!row.source_url) continue
+        try {
+          const host = new URL(row.source_url).hostname.replace(/^www\./, "").toLowerCase()
+          if (host) domains.add(host)
+        } catch {
+          // skip malformed URLs
+        }
+      }
+      excludeDomains = Array.from(domains)
+    }
+
+    const results = await getCompetitorBacklinks({
+      competitor,
+      excludeDomains,
+      limit,
+    })
+
+    return jsonResult({
+      competitor,
+      my_domain: myDomain || null,
+      excluded_count: excludeDomains.length,
+      results,
+    })
   },
 })

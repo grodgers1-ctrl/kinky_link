@@ -16,6 +16,7 @@ const TOOLS = [
   { name: "find_quick_win_keywords", description: "Return keywords ranking on GSC pages 2-3 with impressions — the striking-distance opportunities. Sorted by opportunity score." },
   { name: "find_prospect_gaps", description: "Return prospects in a campaign that are missing a contact email, sorted by Domain Authority." },
   { name: "list_lost_backlinks", description: "Return backlinks that are currently broken, unreachable, or redirected. Optionally filter by since date." },
+  { name: "find_competitor_backlinks", description: "Find pages that link to or feature a competitor in roundups / alternatives / vs. articles. Pass my_domain to get only NEW opportunities (domains that don't already link to you)." },
 ]
 
 export default async function McpDocsPage() {
