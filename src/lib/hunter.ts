@@ -1,13 +1,22 @@
 const HUNTER_API_KEY = process.env.HUNTER_API_KEY
 
-interface HunterResult {
+export interface HunterResult {
   email: string | null
   confidence: string | null
   source: string | null
+  error?: "not_configured" | "rate_limited" | "upstream_error"
+}
+
+interface HunterEmailRow {
+  value?: string
+  confidence?: string
+  type?: string
 }
 
 export async function hunterFindEmail(domain: string): Promise<HunterResult> {
-  if (!HUNTER_API_KEY) return { email: null, confidence: null, source: null }
+  if (!HUNTER_API_KEY) {
+    return { email: null, confidence: null, source: null, error: "not_configured" }
+  }
 
   try {
     const response = await fetch(
@@ -15,22 +24,17 @@ export async function hunterFindEmail(domain: string): Promise<HunterResult> {
     )
 
     if (!response.ok) {
-      if (response.status === 429) return { email: null, confidence: null, source: null }
-      return { email: null, confidence: null, source: null }
+      const error = response.status === 429 ? "rate_limited" : "upstream_error"
+      return { email: null, confidence: null, source: null, error }
     }
 
     const data = await response.json()
-    const emails = data?.data?.emails || []
+    const emails = (data?.data?.emails || []) as HunterEmailRow[]
 
     if (emails.length === 0) return { email: null, confidence: null, source: null }
 
-    const generalEmails = emails.filter((e: any) =>
-      e.type === "generic" || e.type === "unknown"
-    )
-    const personalEmails = emails.filter((e: any) =>
-      e.type === "personal"
-    )
-
+    const generalEmails = emails.filter((e) => e.type === "generic" || e.type === "unknown")
+    const personalEmails = emails.filter((e) => e.type === "personal")
     const best = generalEmails[0] || personalEmails[0] || emails[0]
 
     return {
@@ -40,7 +44,7 @@ export async function hunterFindEmail(domain: string): Promise<HunterResult> {
     }
   } catch (error) {
     console.error("Hunter.io error:", error)
-    return { email: null, confidence: null, source: null }
+    return { email: null, confidence: null, source: null, error: "upstream_error" }
   }
 }
 

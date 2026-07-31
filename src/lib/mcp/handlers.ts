@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/db"
-import { getSerpForKeyword, getDomainFacts, getProspectsForKeyword } from "@/lib/corpus"
+import { getDomainFacts, getProspectsForKeyword } from "@/lib/corpus"
 import { hunterFindEmail } from "@/lib/hunter"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
 import { scoreEmail } from "@/lib/spam-score"
@@ -178,6 +178,36 @@ registerTool({
     }
 
     const res = await hunterFindEmail(domain)
+
+    if (res.error === "not_configured") {
+      return jsonResult({
+        domain,
+        email: null,
+        source: null,
+        error: "not_configured",
+        message:
+          "Hunter is not configured on this deployment. Ask the operator to add HUNTER_API_KEY to Vercel — sign up at https://hunter.io then push the key via the Vercel Management API.",
+      })
+    }
+    if (res.error === "rate_limited") {
+      return jsonResult({
+        domain,
+        email: null,
+        source: null,
+        error: "rate_limited",
+        message: "Hunter free-tier monthly quota exhausted. Try again next cycle or upgrade the plan.",
+      })
+    }
+    if (res.error === "upstream_error") {
+      return jsonResult({
+        domain,
+        email: null,
+        source: null,
+        error: "upstream_error",
+        message: "Hunter returned an error. Retry in a minute.",
+      })
+    }
+
     if (res.email) {
       const now = new Date().toISOString()
       await supabaseAdmin.from("domain_facts").upsert(
@@ -190,7 +220,12 @@ registerTool({
         { onConflict: "domain" },
       )
     }
-    return jsonResult({ domain, email: res.email, confidence: res.confidence, source: res.source || "live" })
+    return jsonResult({
+      domain,
+      email: res.email,
+      confidence: res.confidence,
+      source: res.source || "live",
+    })
   },
 })
 
