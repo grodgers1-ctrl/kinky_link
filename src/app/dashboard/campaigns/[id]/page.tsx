@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/db"
 import { redirect } from "next/navigation"
 import { CampaignEmailStats } from "@/components/campaigns/campaign-email-stats"
 import { CampaignEmailActions } from "@/components/campaigns/campaign-email-actions"
+import { CampaignProspectsTable } from "@/components/campaigns/campaign-prospects-table"
 
 export default async function CampaignDetailPage({
   params,
@@ -24,8 +25,14 @@ export default async function CampaignDetailPage({
 
   const { data: prospects } = await supabaseAdmin
     .from("prospects")
-    .select("*")
+    .select("id, url, domain, title, status, email, tags")
     .eq("campaign_id", id)
+    .order("created_at", { ascending: false })
+
+  const { data: sequences } = await supabaseAdmin
+    .from("sequences")
+    .select("id, name")
+    .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
 
   return (
@@ -37,10 +44,15 @@ export default async function CampaignDetailPage({
         </p>
       </div>
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-h3 font-bold text-brand-secondary">Email Finder</h2>
-        <CampaignEmailActions campaignId={id} />
-      </div>
+      <section>
+        <h2 className="text-h3 font-bold text-brand-secondary">
+          Prospects ({prospects?.length || 0})
+        </h2>
+        <CampaignProspectsTable
+          prospects={prospects || []}
+          sequences={sequences || []}
+        />
+      </section>
 
       <section>
         <h2 className="text-h3 font-bold text-brand-secondary">Email Performance</h2>
@@ -50,39 +62,10 @@ export default async function CampaignDetailPage({
       </section>
 
       <section>
-        <h2 className="text-h3 font-bold text-brand-secondary">
-          Prospects ({prospects?.length || 0})
-        </h2>
-        {prospects && prospects.length > 0 ? (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-[#DCDDDE] bg-brand-white">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-[#DCDDDE] text-[#777777]">
-                  <th className="px-4 py-3 font-medium">Domain</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prospects.map((p) => (
-                  <tr key={p.id} className="border-b border-[#DCDDDE] text-brand-secondary last:border-0">
-                    <td className="px-4 py-3 font-medium">{p.domain || p.url}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-brand-primary px-2 py-0.5 text-xs text-brand-secondary">
-                        {p.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[#575858]">{p.email || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="mt-3 rounded-xl border border-[#DCDDDE] bg-brand-white p-6 text-center text-sm text-[#575858]">
-            No prospects in this campaign.
-          </div>
-        )}
+        <div className="flex items-center justify-between">
+          <h2 className="text-h3 font-bold text-brand-secondary">Email Finder</h2>
+          <CampaignEmailActions campaignId={id} />
+        </div>
       </section>
     </div>
   )
