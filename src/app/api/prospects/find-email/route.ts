@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/db"
 import { findEmail, parseName, extractDomain } from "@/lib/email-finder"
-import { hunterFindEmail } from "@/lib/hunter"
+import { findEmailAcrossProviders } from "@/lib/email-cascade"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    let { prospectIds, campaignId } = body
+    const { campaignId } = body
+    let { prospectIds } = body
 
     if (campaignId && !prospectIds) {
       const { data: campaignProspects } = await supabaseAdmin
@@ -39,7 +40,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No prospects found" }, { status: 404 })
     }
 
-    const results: any[] = []
+    interface FindEmailResult {
+      prospectId: string
+      email: string | null
+      confidence: string
+      method: string
+      pattern?: string
+    }
+    const results: FindEmailResult[] = []
 
     for (const prospect of prospects) {
       const domain = extractDomain(prospect.url)
@@ -64,12 +72,12 @@ export async function POST(req: NextRequest) {
           method: patternResult.method,
         })
       } else {
-        const hunterResult = await hunterFindEmail(domain)
-        if (hunterResult.email) {
+        const cascadeResult = await findEmailAcrossProviders(domain)
+        if (cascadeResult.email) {
           await supabaseAdmin
             .from("prospects")
             .update({
-              email: hunterResult.email,
+              email: cascadeResult.email,
               email_verified: false,
               updated_at: new Date().toISOString(),
             })
@@ -77,9 +85,9 @@ export async function POST(req: NextRequest) {
 
           results.push({
             prospectId: prospect.id,
-            email: hunterResult.email,
-            confidence: hunterResult.confidence || "unknown",
-            method: "hunter",
+            email: cascadeResult.email,
+            confidence: cascadeResult.confidence || "unknown",
+            method: cascadeResult.source || "cascade",
           })
         } else {
           results.push({

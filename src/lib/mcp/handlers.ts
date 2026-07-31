@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/db"
 import { getDomainFacts, getProspectsForKeyword } from "@/lib/corpus"
-import { hunterFindEmail } from "@/lib/hunter"
+import { findEmailAcrossProviders } from "@/lib/email-cascade"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
 import { scoreEmail } from "@/lib/spam-score"
 import { exaFindSimilar } from "@/lib/exa"
@@ -177,36 +177,7 @@ registerTool({
       return jsonResult({ domain, email: cached.contact_email, source: "cache" })
     }
 
-    const res = await hunterFindEmail(domain)
-
-    if (res.error === "not_configured") {
-      return jsonResult({
-        domain,
-        email: null,
-        source: null,
-        error: "not_configured",
-        message:
-          "Hunter is not configured on this deployment. Ask the operator to add HUNTER_API_KEY to Vercel — sign up at https://hunter.io then push the key via the Vercel Management API.",
-      })
-    }
-    if (res.error === "rate_limited") {
-      return jsonResult({
-        domain,
-        email: null,
-        source: null,
-        error: "rate_limited",
-        message: "Hunter free-tier monthly quota exhausted. Try again next cycle or upgrade the plan.",
-      })
-    }
-    if (res.error === "upstream_error") {
-      return jsonResult({
-        domain,
-        email: null,
-        source: null,
-        error: "upstream_error",
-        message: "Hunter returned an error. Retry in a minute.",
-      })
-    }
+    const res = await findEmailAcrossProviders(domain)
 
     if (res.email) {
       const now = new Date().toISOString()
@@ -219,12 +190,36 @@ registerTool({
         },
         { onConflict: "domain" },
       )
+      return jsonResult({
+        domain,
+        email: res.email,
+        confidence: res.confidence,
+        source: res.source,
+        attempts: res.attempts,
+      })
     }
+
+    // All providers missed. Report which errored so the caller can act.
+    const notConfigured = res.attempts.filter((a) => a.error === "not_configured").map((a) => a.name)
+    const rateLimited = res.attempts.filter((a) => a.error === "rate_limited").map((a) => a.name)
+
+    const messageParts: string[] = ["No email found for this domain across configured providers."]
+    if (notConfigured.length > 0) {
+      messageParts.push(
+        `Unconfigured providers (add keys to Vercel to enable): ${notConfigured.join(", ")}.`,
+      )
+    }
+    if (rateLimited.length > 0) {
+      messageParts.push(`Rate-limited this cycle: ${rateLimited.join(", ")}.`)
+    }
+
     return jsonResult({
       domain,
-      email: res.email,
-      confidence: res.confidence,
-      source: res.source || "live",
+      email: null,
+      source: null,
+      error: "not_found",
+      message: messageParts.join(" "),
+      attempts: res.attempts,
     })
   },
 })
