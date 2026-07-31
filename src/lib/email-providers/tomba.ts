@@ -16,11 +16,11 @@ async function findEmail(domain: string): Promise<ProviderResult> {
 
   try {
     const response = await fetch(
-      `https://api.tomba.io/v1/domain-search?domain=${encodeURIComponent(domain)}&limit=5`,
+      `https://api.tomba.io/v1/domain-search?domain=${encodeURIComponent(domain)}&limit=10`,
       {
         headers: {
-          "X-Tomba-Key": TOMBA_SECRET_KEY,
-          "X-Tomba-User": TOMBA_PUBLIC_KEY,
+          "X-Tomba-Key": TOMBA_PUBLIC_KEY,
+          "X-Tomba-Secret": TOMBA_SECRET_KEY,
         },
       },
     )
