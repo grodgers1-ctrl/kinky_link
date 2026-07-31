@@ -5,6 +5,7 @@ import { ConnectSitePrompt } from "@/components/dashboard/connect-site-card"
 import { GscSummary } from "@/components/dashboard/gsc-summary"
 import { EmailStats } from "@/components/dashboard/email-stats"
 import { BacklinksWidget } from "@/components/dashboard/backlinks-widget"
+import { NextActionsWidget } from "@/components/dashboard/next-actions-widget"
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -65,6 +66,8 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-h2 font-bold text-brand-secondary">Dashboard</h1>
+
+      <NextActionsWidget userId={session.user.id} sites={sites} />
 
       {sites.map((site) => (
         <div key={site.id} className="space-y-2">
