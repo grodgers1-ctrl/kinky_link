@@ -1,7 +1,9 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/toast"
+import { scoreEmail } from "@/lib/spam-score"
+import { SpamScoreBadge } from "@/components/ui/spam-score-badge"
 
 const CATEGORIES = [
   { value: "", label: "All" },
@@ -16,7 +18,15 @@ const CATEGORIES = [
 export function TemplateLibrary({
   templates,
 }: {
-  templates: { id: string; name: string; category: string; subject: string; body_html: string; is_seed: boolean }[]
+  templates: {
+    id: string
+    name: string
+    category: string
+    subject: string
+    body_html: string
+    body_text?: string
+    is_seed: boolean
+  }[]
 }) {
   const router = useRouter()
   const { addToast } = useToast()
@@ -64,36 +74,13 @@ export function TemplateLibrary({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((t) => (
-            <div key={t.id} className="flex flex-col rounded-xl border border-[#DCDDDE] bg-brand-white p-4">
-              <div className="flex items-start justify-between">
-                <h3 className="font-medium text-brand-secondary">{t.name}</h3>
-                {t.is_seed && (
-                  <span className="rounded-full bg-brand-primary px-2 py-0.5 text-[10px] text-brand-secondary">
-                    Seed
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-[#777777]">{t.category}</p>
-              <p className="mt-2 truncate text-sm text-[#575858]">{t.subject}</p>
-              <p className="mt-1 line-clamp-2 text-xs text-[#999999]">
-                {t.body_html.replace(/<[^>]+>/g, "").slice(0, 120)}...
-              </p>
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => setSelectedId(t.id)}
-                  className="rounded bg-brand-secondary px-3 py-1 text-xs font-medium text-brand-white"
-                >
-                  Use
-                </button>
-                <button
-                  onClick={() => remove(t.id)}
-                  disabled={deleting === t.id}
-                  className="rounded border border-[#CCCCCD] px-3 py-1 text-xs text-[#575858] hover:bg-brand-surface disabled:opacity-50"
-                >
-                  {deleting === t.id ? "..." : "Delete"}
-                </button>
-              </div>
-            </div>
+            <TemplateCard
+              key={t.id}
+              template={t}
+              onSelect={() => setSelectedId(t.id)}
+              onRemove={() => remove(t.id)}
+              removing={deleting === t.id}
+            />
           ))}
         </div>
       )}
@@ -105,6 +92,72 @@ export function TemplateLibrary({
           onSent={() => { setSelectedId(null); addToast("Email sent") }}
         />
       )}
+    </div>
+  )
+}
+
+function TemplateCard({
+  template,
+  onSelect,
+  onRemove,
+  removing,
+}: {
+  template: {
+    id: string
+    name: string
+    category: string
+    subject: string
+    body_html: string
+    body_text?: string
+    is_seed: boolean
+  }
+  onSelect: () => void
+  onRemove: () => void
+  removing: boolean
+}) {
+  const spamScore = useMemo(
+    () =>
+      scoreEmail({
+        subject: template.subject,
+        bodyHtml: template.body_html,
+        bodyText: template.body_text || "",
+      }),
+    [template.subject, template.body_html, template.body_text],
+  )
+
+  return (
+    <div className="flex flex-col rounded-xl border border-[#DCDDDE] bg-brand-white p-4">
+      <div className="flex items-start justify-between">
+        <h3 className="font-medium text-brand-secondary">{template.name}</h3>
+        {template.is_seed && (
+          <span className="rounded-full bg-brand-primary px-2 py-0.5 text-[10px] text-brand-secondary">
+            Seed
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-[#777777]">{template.category}</p>
+      <div className="mt-2">
+        <SpamScoreBadge result={spamScore} />
+      </div>
+      <p className="mt-3 truncate text-sm text-[#575858]">{template.subject}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-[#999999]">
+        {template.body_html.replace(/<[^>]+>/g, "").slice(0, 120)}...
+      </p>
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={onSelect}
+          className="rounded bg-brand-secondary px-3 py-1 text-xs font-medium text-brand-white"
+        >
+          Use
+        </button>
+        <button
+          onClick={onRemove}
+          disabled={removing}
+          className="rounded border border-[#CCCCCD] px-3 py-1 text-xs text-[#575858] hover:bg-brand-surface disabled:opacity-50"
+        >
+          {removing ? "..." : "Delete"}
+        </button>
+      </div>
     </div>
   )
 }
