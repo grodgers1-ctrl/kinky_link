@@ -62,8 +62,30 @@ endpoint on port 3000.
 
 ### Configure on Glama (server admin page)
 
+Glama auto-generates the Dockerfile and forces a `mcp-proxy -- ...` CMD (the
+UI re-inserts it even if changed). The repo ships a stdio bridge so that
+forced CMD works with the HTTP MCP server:
+
+- `scripts/mcp-stdio-bridge.mjs` — MCP JSON-RPC over stdin/stdout, forwards to `POST /api/mcp`
+- `scripts/glama-next-wrapper.mjs` — starts real `next start` in the background, then runs the bridge
+- `scripts/patch-glama-bin.mjs` — replaces `node_modules/next/dist/bin/next` with the wrapper (real CLI preserved as `next.orig`)
+
+**Set build steps to:**
+
+```json
+["npm ci", "npm run build", "node scripts/patch-glama-bin.mjs"]
+```
+
+The final step installs the shim **after** `next build` runs, so the image
+build is unaffected. At container start, `npx next start` resolves to the
+wrapper: Next boots on :3000, and mcp-proxy's stdio traffic is bridged to the
+HTTP MCP endpoint.
+
+Leave the **CMD** field as Glama sets it (`mcp-proxy -- npx next start`) — the
+bridge makes it work.
+
 1. Claim the server under **admin settings** on your Glama server page.
-2. Provide the repo URL — Glama picks up the `Dockerfile` at the repo root.
+2. Set **build steps** to the three-item array above.
 3. Set these **environment variables** in the Glama admin env config so the
    container can run:
 
