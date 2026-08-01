@@ -277,6 +277,20 @@ export default async function Home() {
             <span>&copy; {new Date().getFullYear()} kinkylink</span>
           </div>
           <div className="flex items-center gap-5">
+            <a
+              href="https://glama.ai/mcp/servers/grodgers1-ctrl/kinky_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="opacity-80 transition-opacity hover:opacity-100"
+              aria-label="Listed on Glama MCP directory"
+            >
+              <img
+                src="https://glama.ai/mcp/servers/grodgers1-ctrl/kinky_link/badge"
+                alt="MCP Server on Glama"
+                width={250}
+                height={64}
+              />
+            </a>
             <Link href="/pricing" className="hover:text-brand-secondary">
               Pricing
             </Link>
