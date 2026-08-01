@@ -54,6 +54,54 @@ list_replies — prospects who replied
 list_backlinks — backlinks earned to your sites
 ```
 
+## Glama Dockerfile (for automated safety/quality checks)
+
+Glama runs your Dockerfile to validate the server. A production-ready `Dockerfile`
+is included in the repo root — it builds the Next.js app and exposes the MCP
+endpoint on port 3000.
+
+### Configure on Glama (server admin page)
+
+1. Claim the server under **admin settings** on your Glama server page.
+2. Provide the repo URL — Glama picks up the `Dockerfile` at the repo root.
+3. Set these **environment variables** in the Glama admin env config so the
+   container can run:
+
+   | Variable | Value |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | `https://oqzymbhniajvinbwhrmv.supabase.co` |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | (anon key from Settings → API) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | (service role key from Settings → API) |
+   | `AUTH_SECRET` | any random string (used by NextAuth only for web flows) |
+   | `MCP_TEST_KEY` | `sk_ll_glama_test` |
+
+4. For the **Authorization header** Glama uses during checks, set it to the same
+   value as `MCP_TEST_KEY` (e.g. `Bearer sk_ll_glama_test`).
+
+The `MCP_TEST_KEY` env var puts the server into a check-friendly mode: that
+literal token is accepted as a valid key for a synthetic test user, so the
+`initialize` / `tools/list` / `tools/call` probes pass without a real API key.
+It is opt-in — without the env var set, authentication is unchanged and only
+real `sk_ll_...` keys issued from the dashboard work.
+
+### Local smoke test of the Docker image
+
+```bash
+cd linklight
+docker build -t linklight .
+docker run -d --name linklight -p 3000:3000 \
+  -e NEXT_PUBLIC_SUPABASE_URL=https://oqzymbhniajvinbwhrmv.supabase.co \
+  -e SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY \
+  -e AUTH_SECRET=random-string \
+  -e MCP_TEST_KEY=sk_ll_glama_test \
+  linklight
+curl http://localhost:3000/api/mcp        # -> {"status":"ok",...}
+curl -X POST http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer sk_ll_glama_test" -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+docker rm -f linklight
+```
+
 ## Submission links
 
 | Directory | Submit at |

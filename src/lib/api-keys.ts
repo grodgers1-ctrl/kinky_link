@@ -23,7 +23,17 @@ export function hashKey(raw: string): string {
 }
 
 export async function verifyKey(raw: string): Promise<string | null> {
-  if (!raw || !raw.startsWith(KEY_PREFIX)) return null
+  if (!raw) return null
+
+  // Directory check / CI mode: when MCP_TEST_KEY is set, that literal token is
+  // accepted as a valid key for a synthetic test user. Opt-in only — without
+  // the env var this branch is inert. Used by Glama etc. automated checks.
+  const testKey = process.env.MCP_TEST_KEY
+  if (testKey && raw === testKey) {
+    return "00000000-0000-4000-8000-000000000000"
+  }
+
+  if (!raw.startsWith(KEY_PREFIX)) return null
   const hash = hashKey(raw)
   const { data } = await supabaseAdmin
     .from("api_keys")
