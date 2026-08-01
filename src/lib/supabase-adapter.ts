@@ -1,11 +1,24 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Adapter, AdapterUser } from "@auth/core/adapters"
 
-export function SupabaseAdapter(options: { url: string; secret: string }): Adapter {
-  const supabase = createClient(options.url, options.secret, {
-    auth: { persistSession: false },
-    global: { headers: { "X-Client-Info": "@auth/supabase-adapter" } },
+// Lazy client: createClient only runs when a method is actually called at
+// runtime. This keeps module-scope construction (NextAuth adapter wiring)
+// safe during builds where env vars are absent (e.g. Glama Docker checks).
+function lazyClient(getter: () => SupabaseClient): SupabaseClient {
+  return new Proxy({} as SupabaseClient, {
+    get(_, prop) {
+      return (getter() as any)[prop]
+    },
   })
+}
+
+export function SupabaseAdapter(options: { url: string; secret: string }): Adapter {
+  const supabase = lazyClient(() =>
+    createClient(options.url, options.secret, {
+      auth: { persistSession: false },
+      global: { headers: { "X-Client-Info": "@auth/supabase-adapter" } },
+    }),
+  )
 
   function wrap<A extends unknown[], R>(name: string, fn: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
     return async (...args: A) => {
