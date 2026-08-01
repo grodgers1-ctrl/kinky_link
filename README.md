@@ -98,4 +98,4 @@ See [docs/mcp/directory-submission.md](docs/mcp/directory-submission.md) for rea
 
 ## License
 
-Proprietary. All rights reserved.
+MIT — see [LICENSE](LICENSE).
