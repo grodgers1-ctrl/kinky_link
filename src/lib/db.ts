@@ -14,7 +14,10 @@ export function getSupabase() {
 
 let _admin: SupabaseClient | null = null
 export function getSupabaseAdmin() {
-  if (!_admin) _admin = createClient(getUrl(), process.env.SUPABASE_SERVICE_ROLE_KEY || "")
+  if (!_admin) {
+    const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+    _admin = createClient(getUrl(), key)
+  }
   return _admin
 }
 

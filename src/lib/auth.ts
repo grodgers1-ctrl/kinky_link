@@ -40,7 +40,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   debug: true,
   adapter: SupabaseAdapter({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    secret: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "",
   }),
   session: {
     strategy: "jwt",
