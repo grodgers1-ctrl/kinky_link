@@ -1,10 +1,11 @@
 import { supabaseAdmin } from "@/lib/db"
-import { getDomainFacts, getProspectsForKeyword, getCompetitorBacklinks } from "@/lib/corpus"
+import { getDomainFacts, searchProspects, getCompetitorBacklinks, getCachedSerpRowCount, normalizeKeyword } from "@/lib/corpus"
 import { findEmailAcrossProviders } from "@/lib/email-cascade"
 import { generateEmailDraft, checkAiUsage, getAiUsageRemaining } from "@/lib/ai-writer"
 import { scoreEmail } from "@/lib/spam-score"
 import { fetchProspectContext } from "@/lib/prospect-context"
 import { exaFindSimilar } from "@/lib/exa"
+import { checkBudget, recordUsage, budgetExceededMessage } from "@/lib/usage"
 import { registerTool, jsonResult, errorResult } from "./tools"
 
 registerTool({
@@ -19,13 +20,23 @@ registerTool({
     },
     required: ["keyword"],
   },
-  handler: async (_userId, args) => {
+  handler: async (userId, args) => {
     const keyword = String(args.keyword || "").trim()
     if (!keyword) return errorResult("keyword is required")
     if (keyword.length > 200) return errorResult("keyword too long")
     const limit = Math.min(20, Math.max(1, Number(args.limit) || 10))
-    const results = await getProspectsForKeyword(keyword)
-    return jsonResult(results.slice(0, limit))
+
+    // Cache-fresh queries are free — skip budget enforcement entirely.
+    const cacheRows = await getCachedSerpRowCount(normalizeKeyword(keyword), "keyword")
+    if (cacheRows < 10) {
+      const budget = await checkBudget(userId, "search_prospects")
+      if (!budget.allowed) return errorResult(budgetExceededMessage("search_prospects", budget))
+    }
+
+    const { results, source } = await searchProspects(keyword)
+    if (source === "tavily") await recordUsage(userId, "search_prospects")
+
+    return jsonResult({ source, results: results.slice(0, limit) })
   },
 })
 
@@ -159,13 +170,13 @@ registerTool({
 registerTool({
   name: "find_email",
   description:
-    "Look up a contact email for a domain via Hunter. Cached in domain_facts on hit.",
+    "Look up a contact email for a domain. Cache-first (free), then a cascade across configured providers (Hunter, Apollo, ContactOut, Tomba). Cached hits are instant and don't count against the daily budget.",
   inputSchema: {
     type: "object",
     properties: { domain: { type: "string" } },
     required: ["domain"],
   },
-  handler: async (_userId, args) => {
+  handler: async (userId, args) => {
     const domain = String(args.domain || "").trim().toLowerCase()
     if (!domain) return errorResult("domain is required")
 
@@ -178,7 +189,11 @@ registerTool({
       return jsonResult({ domain, email: cached.contact_email, source: "cache" })
     }
 
+    const budget = await checkBudget(userId, "find_email")
+    if (!budget.allowed) return errorResult(budgetExceededMessage("find_email", budget))
+
     const res = await findEmailAcrossProviders(domain)
+    await recordUsage(userId, "find_email")
 
     if (res.email) {
       const now = new Date().toISOString()
@@ -361,7 +376,7 @@ registerTool({
     },
     required: ["url"],
   },
-  handler: async (_userId, args) => {
+  handler: async (userId, args) => {
     const url = String(args.url || "").trim()
     if (!url) return errorResult("url is required")
     try {
@@ -369,8 +384,12 @@ registerTool({
     } catch {
       return errorResult(`Invalid URL: ${url}`)
     }
+    const budget = await checkBudget(userId, "find_similar_prospects")
+    if (!budget.allowed) return errorResult(budgetExceededMessage("find_similar_prospects", budget))
+
     const limit = Math.min(50, Math.max(1, Number(args.limit) || 10))
     const results = await exaFindSimilar(url, { numResults: limit })
+    await recordUsage(userId, "find_similar_prospects")
     const enriched = results.map((r) => {
       let domain = ""
       try {
@@ -509,7 +528,7 @@ registerTool({
 registerTool({
   name: "find_competitor_backlinks",
   description:
-    "Return pages that link to or feature a competitor in roundups / lists / alternatives / vs. articles — the classic 'who could realistically link to me if they link to my competitor' list. Optionally excludes domains that already link to my_domain (pass my_domain to get only NEW opportunities). Returns url, title, domain, position, and Moz Domain Authority.",
+    "Return pages VERIFIED to link to a competitor — every result in `results` was fetched and confirmed to contain a live hyperlink to competitor_domain, with anchor text and rel (dofollow/nofollow) included; dofollow links are ranked first. Pages that could not be fetched are listed separately in `unverified` and pages confirmed to have no link are dropped entirely. Pass my_domain to filter out domains already linking to you, so results are only NEW opportunities. Also returns Moz Domain Authority per domain.",
   inputSchema: {
     type: "object",
     properties: {
@@ -558,17 +577,238 @@ registerTool({
       excludeDomains = Array.from(domains)
     }
 
-    const results = await getCompetitorBacklinks({
+    // Cache-fresh competitor queries are free — skip budget enforcement.
+    const competitorCacheKey = competitor
+      .replace(/^https?:\/\//, "")
+      .replace(/\/.*$/, "")
+      .replace(/^www\./, "")
+      .toLowerCase()
+    const cacheRows = await getCachedSerpRowCount(competitorCacheKey, "competitor")
+    if (cacheRows === 0) {
+      const budget = await checkBudget(userId, "find_competitor_backlinks")
+      if (!budget.allowed) {
+        return errorResult(budgetExceededMessage("find_competitor_backlinks", budget))
+      }
+    }
+
+    const outcome = await getCompetitorBacklinks({
       competitor,
       excludeDomains,
       limit,
     })
 
+    // Only Tavily-backed calls consume quota; cache-served and fetch-only
+    // calls are free.
+    if (outcome.stats.serpSource === "tavily") {
+      await recordUsage(userId, "find_competitor_backlinks")
+    }
+
     return jsonResult({
       competitor,
       my_domain: myDomain || null,
       excluded_count: excludeDomains.length,
-      results,
+      results: outcome.verified,
+      unverified: outcome.unverified,
+      dropped_no_link_count: outcome.droppedNoLink,
+      stats: outcome.stats,
     })
+  },
+})
+
+// ---------------------------------------------------------------------------
+// Prospect creation — closes the find → enrich → draft → queue loop from MCP.
+// ---------------------------------------------------------------------------
+
+interface CreateProspectInput {
+  url: string
+  title?: string
+  email?: string
+  notes?: string
+}
+
+function normalizeProspectUrl(raw: string): { url: string; domain: string } | null {
+  let u: URL
+  try {
+    u = new URL(raw.trim())
+  } catch {
+    return null
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null
+  const domain = u.hostname.toLowerCase().replace(/^www\./, "")
+  if (!domain) return null
+  return { url: u.toString(), domain }
+}
+
+/**
+ * Insert a prospect, deduping on (user, campaign, domain) — you pitch a site
+ * once. Enriches from the shared domain_facts cache only; never triggers a
+ * paid lookup (Moz/Hunter stay explicit tool calls).
+ */
+async function createProspectDeduped(
+  userId: string,
+  campaignId: string,
+  input: CreateProspectInput,
+): Promise<
+  | { ok: true; prospect: Record<string, unknown>; deduped: boolean }
+  | { ok: false; error: string }
+> {
+  const parsed = normalizeProspectUrl(input.url)
+  if (!parsed) return { ok: false, error: `Invalid URL: ${input.url}` }
+  const { url, domain } = parsed
+
+  const { data: existing } = await supabaseAdmin
+    .from("prospects")
+    .select("id, campaign_id, url, domain, title, email, status, domain_authority, created_at")
+    .eq("user_id", userId)
+    .eq("campaign_id", campaignId)
+    .eq("domain", domain)
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) return { ok: true, prospect: existing, deduped: true }
+
+  // Cache-only enrichment: read domain_facts directly, do NOT call
+  // getDomainFacts (which would burn a Moz row on a miss).
+  const { data: facts } = await supabaseAdmin
+    .from("domain_facts")
+    .select("domain_authority, contact_email")
+    .eq("domain", domain)
+    .maybeSingle()
+
+  const now = new Date().toISOString()
+  const { data: inserted, error } = await supabaseAdmin
+    .from("prospects")
+    .insert({
+      user_id: userId,
+      campaign_id: campaignId,
+      url,
+      domain,
+      title: input.title?.trim() || null,
+      email: input.email?.trim() || facts?.contact_email || null,
+      notes: input.notes?.trim() || null,
+      domain_authority: facts?.domain_authority ?? null,
+      status: "prospect",
+      updated_at: now,
+    })
+    .select("id, campaign_id, url, domain, title, email, status, domain_authority, created_at")
+    .single()
+
+  if (error || !inserted) {
+    return { ok: false, error: `Insert failed: ${error?.message || "unknown"}` }
+  }
+  return { ok: true, prospect: inserted, deduped: false }
+}
+
+async function assertCampaignOwnership(
+  userId: string,
+  campaignId: string,
+): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from("campaigns")
+    .select("id")
+    .eq("id", campaignId)
+    .eq("user_id", userId)
+    .maybeSingle()
+  return !!data
+}
+
+registerTool({
+  name: "create_prospect",
+  description:
+    "Add a prospect to a campaign. Dedupes on (campaign, domain): if that domain is already in the campaign, returns the existing prospect with deduped: true instead of creating a duplicate. Enriches from the shared cache when warm (Domain Authority, known contact email) — this tool never triggers paid lookups. New prospects start with status 'prospect'. Free: no external API calls.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      campaign_id: { type: "string", description: "Campaign UUID from list_campaigns" },
+      url: { type: "string", description: "Prospect page URL (http/https)" },
+      title: { type: "string" },
+      email: { type: "string", description: "Optional; falls back to cached contact email" },
+      notes: { type: "string" },
+    },
+    required: ["campaign_id", "url"],
+  },
+  handler: async (userId, args) => {
+    const campaignId = String(args.campaign_id || "").trim()
+    const url = String(args.url || "").trim()
+    if (!campaignId) return errorResult("campaign_id is required")
+    if (!url) return errorResult("url is required")
+
+    if (!(await assertCampaignOwnership(userId, campaignId))) {
+      return errorResult("Campaign not found")
+    }
+
+    const result = await createProspectDeduped(userId, campaignId, {
+      url,
+      title: args.title ? String(args.title) : undefined,
+      email: args.email ? String(args.email) : undefined,
+      notes: args.notes ? String(args.notes) : undefined,
+    })
+    if (!result.ok) return errorResult(result.error)
+    return jsonResult({ prospect: result.prospect, deduped: result.deduped })
+  },
+})
+
+registerTool({
+  name: "bulk_create_prospects",
+  description:
+    "Add up to 25 prospects to a campaign in one call. Each entry is deduped on (campaign, domain) exactly like create_prospect. Returns per-entry outcomes plus created/deduped/failed counts. Free: no external API calls.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      campaign_id: { type: "string", description: "Campaign UUID from list_campaigns" },
+      prospects: {
+        type: "array",
+        maxItems: 25,
+        items: {
+          type: "object",
+          properties: {
+            url: { type: "string" },
+            title: { type: "string" },
+            email: { type: "string" },
+            notes: { type: "string" },
+          },
+          required: ["url"],
+        },
+      },
+    },
+    required: ["campaign_id", "prospects"],
+  },
+  handler: async (userId, args) => {
+    const campaignId = String(args.campaign_id || "").trim()
+    if (!campaignId) return errorResult("campaign_id is required")
+
+    const items = Array.isArray(args.prospects) ? args.prospects.slice(0, 25) : []
+    if (items.length === 0) return errorResult("prospects must be a non-empty array (max 25)")
+
+    if (!(await assertCampaignOwnership(userId, campaignId))) {
+      return errorResult("Campaign not found")
+    }
+
+    const outcomes: ({ index: number } & (
+      | { ok: true; prospect: Record<string, unknown>; deduped: boolean }
+      | { ok: false; error: string }
+    ))[] = []
+
+    for (let i = 0; i < items.length; i++) {
+      const item = (items[i] || {}) as Record<string, unknown>
+      const url = String(item.url || "").trim()
+      if (!url) {
+        outcomes.push({ index: i, ok: false, error: "url is required" })
+        continue
+      }
+      const result = await createProspectDeduped(userId, campaignId, {
+        url,
+        title: item.title ? String(item.title) : undefined,
+        email: item.email ? String(item.email) : undefined,
+        notes: item.notes ? String(item.notes) : undefined,
+      })
+      outcomes.push({ index: i, ...result })
+    }
+
+    const created = outcomes.filter((o) => o.ok && !("deduped" in o && o.deduped)).length
+    const deduped = outcomes.filter((o) => o.ok && "deduped" in o && o.deduped).length
+    const failed = outcomes.filter((o) => !o.ok).length
+
+    return jsonResult({ created, deduped, failed, outcomes })
   },
 })

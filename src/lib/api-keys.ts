@@ -3,6 +3,10 @@ import { supabaseAdmin } from "@/lib/db"
 
 const KEY_PREFIX = "sk_ll_"
 
+/** Synthetic user for MCP_TEST_KEY (directory checks / CI). */
+const TEST_USER_ID = "00000000-0000-4000-8000-000000000000"
+const TEST_USER_EMAIL = "mcp-test@linklight.local"
+
 export interface ApiKeyRow {
   id: string
   name: string
@@ -30,7 +34,15 @@ export async function verifyKey(raw: string): Promise<string | null> {
   // the env var this branch is inert. Used by Glama etc. automated checks.
   const testKey = process.env.MCP_TEST_KEY
   if (testKey && raw === testKey) {
-    return "00000000-0000-4000-8000-000000000000"
+    // The synthetic user must actually exist, or write tools (create_prospect,
+    // save_draft, …) fail on the prospects/campaigns FK to users. Idempotent.
+    await supabaseAdmin
+      .from("users")
+      .upsert(
+        { id: TEST_USER_ID, email: TEST_USER_EMAIL, name: "MCP Test (synthetic)" },
+        { onConflict: "id" },
+      )
+    return TEST_USER_ID
   }
 
   if (!raw.startsWith(KEY_PREFIX)) return null

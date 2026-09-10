@@ -9,7 +9,7 @@ Use these values everywhere:
 | Field | Value |
 |---|---|
 | **Name** | linklight |
-| **Short description** | The MCP server for SEO — find prospects, draft outreach, and monitor backlinks from your AI agent. |
+| **Short description** | The MCP server for SEO. Find prospects, draft outreach, and monitor backlinks from your AI agent. |
 | **Long description** | linklight gives your AI agent a full link-building toolkit: search for prospect sites by keyword (Tavily + Moz DA), find pages that link to your competitors in roundup/alternatives articles, discover similar prospects via Exa.ai, look up contact emails (Hunter), draft personalised outreach emails with a built-in spam score (OpenAI), and query your campaigns, prospects, backlinks, and replies. Sending is never automated — every email needs your approval. |
 | **Repo URL** | https://github.com/grodgers1-ctrl/kinky_link |
 | **Website / docs** | https://lightlinks.dev/docs/mcp |
@@ -35,14 +35,16 @@ Use these values everywhere:
 }
 ```
 
-## Tools list (14) — paste into "Tools" field if the directory has one
+## Tools list (16) — paste into "Tools" field if the directory has one
 
 ```
-search_prospects — find prospect sites for a keyword (Tavily + Moz DA)
-find_competitor_backlinks — find pages linking to a competitor in roundups/alternatives; pass my_domain for only-new opportunities
+search_prospects — find prospect sites for a keyword (cache-first, Tavily + Moz DA)
+find_competitor_backlinks — pages fetch-VERIFIED to link to a competitor, with anchor text + dofollow/nofollow; pass my_domain for only-new opportunities
+create_prospect — add a prospect to a campaign (dedupes by domain; free, cache-enriched)
+bulk_create_prospects — add up to 25 prospects in one call (same dedupe rules)
 find_similar_prospects — semantically similar URLs to a known-good prospect (Exa.ai)
 enrich_domain — Moz DA + contact email + homepage title/description
-find_email — contact email lookup (Hunter)
+find_email — contact email lookup, cached then cascaded (Hunter, Apollo, ContactOut, Tomba)
 draft_email — personalised outreach email + spam score (OpenAI)
 save_draft — save a draft against a prospect for review (never sends)
 find_quick_win_keywords — striking-distance GSC keywords
@@ -52,76 +54,6 @@ list_campaigns — list campaigns
 list_prospects — list prospects (filter by campaign/status)
 list_replies — prospects who replied
 list_backlinks — backlinks earned to your sites
-```
-
-## Glama Dockerfile (for automated safety/quality checks)
-
-Glama runs your Dockerfile to validate the server. A production-ready `Dockerfile`
-is included in the repo root — it builds the Next.js app and exposes the MCP
-endpoint on port 3000.
-
-### Configure on Glama (server admin page)
-
-Glama auto-generates the Dockerfile and forces a `mcp-proxy -- ...` CMD (the
-UI re-inserts it even if changed). The repo ships a stdio bridge so that
-forced CMD works with the HTTP MCP server:
-
-- `scripts/mcp-stdio-bridge.mjs` — MCP JSON-RPC over stdin/stdout, forwards to `POST /api/mcp`
-- `scripts/glama-next-wrapper.mjs` — starts real `next start` in the background, then runs the bridge
-- `scripts/patch-glama-bin.mjs` — replaces `node_modules/next/dist/bin/next` with the wrapper (real CLI preserved as `next.orig`)
-
-**Set build steps to:**
-
-```json
-["npm ci", "npm run build", "node scripts/patch-glama-bin.mjs"]
-```
-
-The final step installs the shim **after** `next build` runs, so the image
-build is unaffected. At container start, `npx next start` resolves to the
-wrapper: Next boots on :3000, and mcp-proxy's stdio traffic is bridged to the
-HTTP MCP endpoint.
-
-Leave the **CMD** field as Glama sets it (`mcp-proxy -- npx next start`) — the
-bridge makes it work.
-
-1. Claim the server under **admin settings** on your Glama server page.
-2. Set **build steps** to the three-item array above.
-3. Set these **environment variables** in the Glama admin env config so the
-   container can run:
-
-   | Variable | Value |
-   |---|---|
-   | `NEXT_PUBLIC_SUPABASE_URL` | `https://oqzymbhniajvinbwhrmv.supabase.co` |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | (anon key from Settings → API) |
-   | `SUPABASE_SERVICE_ROLE_KEY` | (service role key from Settings → API) |
-   | `AUTH_SECRET` | any random string (used by NextAuth only for web flows) |
-   | `MCP_TEST_KEY` | `sk_ll_glama_test` |
-
-4. For the **Authorization header** Glama uses during checks, set it to the same
-   value as `MCP_TEST_KEY` (e.g. `Bearer sk_ll_glama_test`).
-
-The `MCP_TEST_KEY` env var puts the server into a check-friendly mode: that
-literal token is accepted as a valid key for a synthetic test user, so the
-`initialize` / `tools/list` / `tools/call` probes pass without a real API key.
-It is opt-in — without the env var set, authentication is unchanged and only
-real `sk_ll_...` keys issued from the dashboard work.
-
-### Local smoke test of the Docker image
-
-```bash
-cd linklight
-docker build -t linklight .
-docker run -d --name linklight -p 3000:3000 \
-  -e NEXT_PUBLIC_SUPABASE_URL=https://oqzymbhniajvinbwhrmv.supabase.co \
-  -e SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY \
-  -e AUTH_SECRET=random-string \
-  -e MCP_TEST_KEY=sk_ll_glama_test \
-  linklight
-curl http://localhost:3000/api/mcp        # -> {"status":"ok",...}
-curl -X POST http://localhost:3000/api/mcp \
-  -H "Authorization: Bearer sk_ll_glama_test" -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-docker rm -f linklight
 ```
 
 ## Submission links
