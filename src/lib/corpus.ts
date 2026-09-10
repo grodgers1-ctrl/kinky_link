@@ -25,7 +25,16 @@ export function buildCompetitorBacklinkQuery(competitor: string): string {
     .replace(/^https?:\/\//, "")
     .replace(/\/.*$/, "")
     .replace(/^www\./, "")
-  return `"${bare}" roundup OR "best of" OR "alternatives to" OR list OR review OR "vs"`
+  return `"${bare}" review`
+}
+
+/** Exact match or subdomain of an excluded domain (help.foo.com ⊂ foo.com). */
+function isExcludedDomain(domain: string, exclude: Set<string>): boolean {
+  const d = domain.toLowerCase()
+  for (const ex of exclude) {
+    if (d === ex || d.endsWith(`.${ex}`)) return true
+  }
+  return false
 }
 
 function isLikelyCompetitor(domain: string, keyword: string): boolean {
@@ -424,7 +433,9 @@ export async function getCompetitorBacklinks(opts: {
   let ccLinkingDomains = 0
   try {
     const linking = await getCcLinkingDomains(competitorDomain)
-    const freshSources = linking.filter((l) => !exclude.has(l.source_domain.toLowerCase()))
+    const freshSources = linking.filter(
+      (l) => !isExcludedDomain(l.source_domain, exclude),
+    )
     ccLinkingDomains = freshSources.length
     const ccLimiter = pLimit(4)
     const resolved = await Promise.all(
@@ -469,7 +480,7 @@ export async function getCompetitorBacklinks(opts: {
   }
 
   const serpCandidates = (rows as CandidateRow[]).filter(
-    (r) => !exclude.has(String(r.domain).toLowerCase()),
+    (r) => !isExcludedDomain(String(r.domain), exclude),
   )
   // CC candidates first: verified real linkers take precedence in dedupe.
   // Backfill title/description from SERP rows so CC rows aren't title-less.
