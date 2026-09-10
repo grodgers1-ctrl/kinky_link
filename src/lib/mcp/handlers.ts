@@ -528,7 +528,7 @@ registerTool({
 registerTool({
   name: "find_competitor_backlinks",
   description:
-    "Return pages VERIFIED to link to a competitor — every result in `results` was fetched and confirmed to contain a live hyperlink to competitor_domain, with anchor text and rel (dofollow/nofollow) included; dofollow links are ranked first. Pages that could not be fetched are listed separately in `unverified` and pages confirmed to have no link are dropped entirely. Pass my_domain to filter out domains already linking to you, so results are only NEW opportunities. Also returns Moz Domain Authority per domain.",
+    "Return pages VERIFIED to link to a competitor — backed by the Common Crawl link graph (real link data, not mention-search) plus SERP candidates, with every result in `results` fetched and confirmed to contain a live hyperlink to competitor_domain. Anchor text and rel (dofollow/nofollow) included; dofollow links are ranked first. Pages that could not be fetched are listed separately in `unverified` and pages confirmed to have no link are dropped entirely. Pass my_domain to filter out domains already linking to you, so results are only NEW opportunities. Also returns Moz Domain Authority per domain.",
   inputSchema: {
     type: "object",
     properties: {

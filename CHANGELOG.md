@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.2.0] — 2026-09-10
+
+Zero-cost outreach release: real link data, verification, and spend guards.
+
+### MCP Server
+
+- `find_competitor_backlinks` rebuilt: candidates now come from the Common Crawl
+  domain link graph (real link data, free) plus the SERP cache, and every result
+  is fetch-verified to contain a live hyperlink to the competitor (anchor text +
+  dofollow/nofollow included). Pages with no link are dropped; unfetchable pages
+  are reported separately as `unverified`.
+- New tools: `create_prospect` and `bulk_create_prospects` — close the
+  find → enrich → draft → queue loop from MCP. Dedupe on (campaign, domain);
+  cache-only enrichment, no paid lookups.
+- Per-user daily budgets (`api_key_usage`) on every tool that can hit an
+  external API; cache-served calls never count. Limits are env-overridable.
+- `search_prospects` is now genuinely cache-first (was live-first despite docs).
+- `verifyKey` upserts the synthetic `MCP_TEST_KEY` user so write tools pass FK.
+
+### Data & Cost
+
+- Common Crawl domain-graph import (`scripts/import-cc-graph.mts`): quarterly,
+  resumable, filtered to queried competitors only (`cc_targets` → `cc_link_graph`).
+- Moz auth fixed: supports `MOZ_API_KEY` (`x-moz-token`, modern `{targets}` shape)
+  alongside legacy HMAC credentials — DA was silently null before.
+- Moz monthly circuit breaker (default 45 rows/mo via `provider_usage`) —
+  the 50-row free tier can no longer be exhausted by a loop; DA degrades to null.
+- New tables: `verified_mentions`, `cc_targets`, `cc_link_graph`,
+  `provider_usage`, `api_key_usage`; `prospect_serp_cache` gains `query_kind`.
+
 ## [0.1.0] — 2026-08-01
 
 First public release of linklight — the MCP server for SEO.

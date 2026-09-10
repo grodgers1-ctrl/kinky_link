@@ -1,13 +1,18 @@
 import { supabaseAdmin } from "@/lib/db"
 import { scrapeSerp } from "@/lib/scraper"
-import { getMozMetrics } from "@/lib/moz"
+import { getMozMetrics, mozConfigured } from "@/lib/moz"
 import { verifyLinkTarget } from "@/lib/link-verifier"
+import { trackCompetitorQuery, getCcLinkingDomains, resolveCandidateUrls } from "@/lib/cc-graph"
 import pLimit from "p-limit"
 
 const SERP_TTL_DAYS = 30
 const DA_TTL_DAYS = 90
 const MIN_CACHED_RESULTS = 10
 const VERIFIED_MENTION_TTL_DAYS = 60
+// Moz free tier is 50 rows/month account-wide; stay under it with headroom.
+const MOZ_MONTHLY_ROW_LIMIT = Number(process.env.LL_MOZ_MONTHLY_ROW_LIMIT) || 45
+// Max CC linking domains resolved per find_competitor_backlinks call.
+const CC_RESOLVE_CAP = 25
 
 const LINKABLE_TITLE_RE = /2024|2025|2026|best|top|review|vs|alternative|guide|resources|list|roundup|tools|directory|recommended|ultimate|complete/i
 
@@ -151,27 +156,51 @@ export async function getDomainFacts(
     return row.da_fetched_at < staleThreshold
   })
 
-  if (needsFetch.length > 0) {
-    const fetched = await Promise.all(
-      needsFetch.map(async (domain) => {
-        try {
-          const moz = await getMozMetrics(domain)
-          return { domain, domain_authority: moz.domainAuthority ?? null }
-        } catch {
-          return { domain, domain_authority: null }
-        }
-      }),
-    )
-    const now = new Date().toISOString()
-    const upserts = fetched.map((f) => ({
-      domain: f.domain,
-      domain_authority: f.domain_authority,
-      da_fetched_at: now,
-      last_seen_at: now,
-    }))
-    await supabaseAdmin.from("domain_facts").upsert(upserts, { onConflict: "domain" })
-    for (const f of fetched) {
-      byDomain[f.domain] = { domain_authority: f.domain_authority, da_fetched_at: now }
+  if (needsFetch.length > 0 && mozConfigured()) {
+    // Monthly circuit breaker: Moz bills 1 row per url_metrics call and the
+    // free tier is 50 rows/month account-wide. Never exceed the cap; degrade
+    // to domain_authority: null instead of failing.
+    const month = new Date().toISOString().slice(0, 7)
+    const { data: usageRow } = await supabaseAdmin
+      .from("provider_usage")
+      .select("rows")
+      .eq("provider", "moz")
+      .eq("month", month)
+      .maybeSingle()
+    const usedRows = usageRow?.rows ?? 0
+    const remaining = Math.max(0, MOZ_MONTHLY_ROW_LIMIT - usedRows)
+    if (remaining === 0) {
+      console.warn(`Moz monthly circuit breaker hit (${usedRows}/${MOZ_MONTHLY_ROW_LIMIT} rows in ${month}) — DA lookups skipped.`)
+    }
+    const toFetch = needsFetch.slice(0, remaining)
+
+    if (toFetch.length > 0) {
+      const fetched = await Promise.all(
+        toFetch.map(async (domain) => {
+          try {
+            const moz = await getMozMetrics(domain)
+            return { domain, domain_authority: moz.domainAuthority ?? null }
+          } catch {
+            return { domain, domain_authority: null }
+          }
+        }),
+      )
+      const now = new Date().toISOString()
+      const upserts = fetched.map((f) => ({
+        domain: f.domain,
+        domain_authority: f.domain_authority,
+        da_fetched_at: now,
+        last_seen_at: now,
+      }))
+      await supabaseAdmin.from("domain_facts").upsert(upserts, { onConflict: "domain" })
+      await supabaseAdmin.rpc("bump_provider_usage", {
+        p_provider: "moz",
+        p_month: month,
+        p_rows: toFetch.length,
+      })
+      for (const f of fetched) {
+        byDomain[f.domain] = { domain_authority: f.domain_authority, da_fetched_at: now }
+      }
     }
   }
 
@@ -301,6 +330,8 @@ export interface CompetitorBacklinksResult {
   droppedNoLink: number
   stats: {
     serpSource: "cache" | "tavily" | "none"
+    /** Domains the Common Crawl graph knows link to the competitor (pre-exclusion filter). */
+    ccLinkingDomains: number
     verificationCacheHits: number
     pagesFetched: number
   }
@@ -314,8 +345,17 @@ interface VerifiedMentionRow {
   rel: "dofollow" | "nofollow" | null
   link_url: string | null
   http_status: number | null
+  page_title: string | null
   unverifiable: boolean
   verified_at: string
+}
+
+interface CandidateRow {
+  url: string
+  title: string | null
+  description: string | null
+  domain: string
+  position: number | null
 }
 
 /** Normalize for dedupe: lowercase host, strip www. and trailing slash. */
@@ -344,8 +384,12 @@ function dedupeByUrl<T extends { url: unknown }>(rows: T[]): T[] {
 /**
  * Find pages that actually link to a competitor — fetch-verified, never just
  * mention-matched. Flow (each tier cheaper than the next):
- *   1. SERP candidates from the shared cache (query_kind='competitor'), Tavily on miss.
- *   2. verified_mentions cache answers "does this page link to X?" for repeat queries.
+ *   0. Common Crawl domain link graph (real link data, free) — domains known
+ *      to link to the competitor are resolved to page URLs via our caches or
+ *      the free CC index API.
+ *   1. SERP candidates from the shared cache (query_kind='competitor');
+ *      Tavily only when both the cache and the CC graph have little to say.
+ *   2. verified_mentions cache answers "does this page link to X?" for repeats.
  *   3. Only cache misses are fetched live (concurrency-capped, one attempt).
  * Pages confirmed to have no link are dropped; unfetchable pages are returned
  * separately as unverified rather than silently mixed in.
@@ -365,31 +409,85 @@ export async function getCompetitorBacklinks(opts: {
     verified: [],
     unverified: [],
     droppedNoLink: 0,
-    stats: { serpSource: "none", verificationCacheHits: 0, pagesFetched: 0 },
+    stats: { serpSource: "none", ccLinkingDomains: 0, verificationCacheHits: 0, pagesFetched: 0 },
   }
 
-  // --- Tier 1: SERP candidates, cache-first -------------------------------
-  let rows = await readCachedSerp(competitorDomain, "competitor")
-  let serpSource: CompetitorBacklinksResult["stats"]["serpSource"] = "cache"
-  if (rows.length === 0) {
-    const scraped = await scrapeSerp(buildCompetitorBacklinkQuery(competitorDomain))
-    if (scraped.length > 0) {
-      await writeSerpCache(competitorDomain, scraped, "competitor")
-      rows = await readCachedSerp(competitorDomain, "competitor")
-      serpSource = "tavily"
-    } else {
-      serpSource = "none"
-    }
-  }
-  if (rows.length === 0) return empty
+  // Track the query so the quarterly CC import knows which targets to extract.
+  await trackCompetitorQuery(competitorDomain)
 
   const exclude = new Set(
     [competitorDomain, ...(opts.excludeDomains || [])].map((d) => d.toLowerCase()),
   )
-  const candidates = dedupeByUrl(
-    rows.filter((r) => !exclude.has(String(r.domain).toLowerCase())),
+
+  // --- Tier 0: Common Crawl domain link graph (free, real link data) -------
+  let ccCandidates: CandidateRow[] = []
+  let ccLinkingDomains = 0
+  try {
+    const linking = await getCcLinkingDomains(competitorDomain)
+    const freshSources = linking.filter((l) => !exclude.has(l.source_domain.toLowerCase()))
+    ccLinkingDomains = freshSources.length
+    const ccLimiter = pLimit(4)
+    const resolved = await Promise.all(
+      freshSources.slice(0, CC_RESOLVE_CAP).map((l) =>
+        ccLimiter(async () => {
+          const urls = await resolveCandidateUrls(l.source_domain, 2)
+          return urls.map(
+            (url): CandidateRow => ({
+              url,
+              title: null,
+              description: null,
+              domain: l.source_domain,
+              position: null,
+            }),
+          )
+        }),
+      ),
+    )
+    ccCandidates = resolved.flat()
+  } catch (error) {
+    console.error("CC graph tier failed (continuing with SERP tier):", error)
+  }
+
+  // --- Tier 1: SERP candidates, cache-first -------------------------------
+  // Skip the paid-quota Tavily call when the CC graph already has plenty to
+  // say — real link data beats mention-search anyway.
+  let rows = await readCachedSerp(competitorDomain, "competitor")
+  let serpSource: CompetitorBacklinksResult["stats"]["serpSource"] = "cache"
+  if (rows.length === 0) {
+    if (ccCandidates.length >= 5) {
+      serpSource = "none"
+    } else {
+      const scraped = await scrapeSerp(buildCompetitorBacklinkQuery(competitorDomain))
+      if (scraped.length > 0) {
+        await writeSerpCache(competitorDomain, scraped, "competitor")
+        rows = await readCachedSerp(competitorDomain, "competitor")
+        serpSource = "tavily"
+      } else {
+        serpSource = "none"
+      }
+    }
+  }
+
+  const serpCandidates = (rows as CandidateRow[]).filter(
+    (r) => !exclude.has(String(r.domain).toLowerCase()),
   )
-  if (candidates.length === 0) return empty
+  // CC candidates first: verified real linkers take precedence in dedupe.
+  // Backfill title/description from SERP rows so CC rows aren't title-less.
+  const serpMeta = new Map(
+    serpCandidates.map((r) => [normalizeUrlForDedupe(r.url), r] as const),
+  )
+  for (const cc of ccCandidates) {
+    const meta = serpMeta.get(normalizeUrlForDedupe(cc.url))
+    if (meta) {
+      cc.title = cc.title || meta.title
+      cc.description = cc.description || meta.description
+      cc.position = cc.position ?? meta.position
+    }
+  }
+  const candidates = dedupeByUrl([...ccCandidates, ...serpCandidates])
+  if (candidates.length === 0) {
+    return { ...empty, stats: { ...empty.stats, serpSource, ccLinkingDomains } }
+  }
 
   // --- Tier 2: verification cache -----------------------------------------
   const urls = candidates.map((r) => String(r.url))
@@ -424,6 +522,7 @@ export async function getCompetitorBacklinks(opts: {
         rel: v.rel,
         link_url: v.linkUrl,
         http_status: v.httpStatus,
+        page_title: v.pageTitle,
         unverifiable: v.unverifiable,
         verified_at: now,
       })),
@@ -438,6 +537,7 @@ export async function getCompetitorBacklinks(opts: {
         rel: v.rel,
         link_url: v.linkUrl,
         http_status: v.httpStatus,
+        page_title: v.pageTitle,
         unverifiable: v.unverifiable,
         verified_at: now,
       })
@@ -445,16 +545,9 @@ export async function getCompetitorBacklinks(opts: {
   }
 
   // --- Split by verdict ----------------------------------------------------
-  interface CandidateRow {
-    url: string
-    title: string | null
-    description: string | null
-    domain: string
-    position: number | null
-  }
   const keep: { row: CandidateRow; verdict: VerifiedMentionRow }[] = []
   let droppedNoLink = 0
-  for (const row of candidates as CandidateRow[]) {
+  for (const row of candidates) {
     const verdict = verdictByUrl.get(row.url)
     if (!verdict) continue
     if (!verdict.links_to_target && !verdict.unverifiable) {
@@ -464,7 +557,7 @@ export async function getCompetitorBacklinks(opts: {
     keep.push({ row, verdict })
   }
   if (keep.length === 0) {
-    return { ...empty, droppedNoLink, stats: { serpSource, verificationCacheHits: cacheHits, pagesFetched: fresh.length } }
+    return { ...empty, droppedNoLink, stats: { serpSource, ccLinkingDomains, verificationCacheHits: cacheHits, pagesFetched: fresh.length } }
   }
 
   // DA enrichment only for rows we are about to return — not every candidate.
@@ -491,7 +584,7 @@ export async function getCompetitorBacklinks(opts: {
 
   const toBacklink = ({ row, verdict }: { row: CandidateRow; verdict: VerifiedMentionRow }): CompetitorBacklink => ({
     url: row.url,
-    title: row.title || "",
+    title: row.title || verdict.page_title || "",
     description: row.description || "",
     domain: row.domain,
     domainAuthority: facts[row.domain]?.domain_authority ?? null,
@@ -509,6 +602,6 @@ export async function getCompetitorBacklinks(opts: {
     verified,
     unverified,
     droppedNoLink,
-    stats: { serpSource, verificationCacheHits: cacheHits, pagesFetched: fresh.length },
+    stats: { serpSource, ccLinkingDomains, verificationCacheHits: cacheHits, pagesFetched: fresh.length },
   }
 }

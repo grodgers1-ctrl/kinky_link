@@ -29,6 +29,8 @@ export interface LinkVerification {
   linkUrl: string | null
   /** HTTP status of the fetch, when a response was received. */
   httpStatus: number | null
+  /** <title> of the fetched page, when successfully parsed. */
+  pageTitle: string | null
   /** True when the page could not be fetched/parsed (403, 429, timeout, network). */
   unverifiable: boolean
 }
@@ -90,6 +92,7 @@ export async function verifyLinkTarget(
     rel: null,
     linkUrl: null,
     httpStatus: null,
+    pageTitle: null,
     unverifiable: true,
   }
 
@@ -123,6 +126,7 @@ export async function verifyLinkTarget(
 
   try {
     const $ = cheerio.load(html)
+    const pageTitle = $("title").first().text().replace(/\s+/g, " ").trim() || null
 
     for (const el of $("a[href]").toArray()) {
       const href = $(el).attr("href") || ""
@@ -133,11 +137,12 @@ export async function verifyLinkTarget(
         anchorText: $(el).text().replace(/\s+/g, " ").trim() || null,
         rel: classifyRel($(el).attr("rel")),
         linkUrl: href,
+        pageTitle,
         unverifiable: false,
       }
     }
     // Fetched and parsed fine, but no link to the target: definitively not a backlink.
-    return { ...base, unverifiable: false }
+    return { ...base, pageTitle, unverifiable: false }
   } catch {
     return base
   }
