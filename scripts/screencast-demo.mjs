@@ -2,7 +2,7 @@
 // Drives the live site with Playwright (installed Edge), captures frames while
 // scrolling through public pages, and assembles an animated GIF.
 // Usage: node scripts/screencast-demo.mjs
-// Output: public/demos/lightlinks-screencast.gif
+// Output: public/demos/linklight-screencast.gif
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -11,7 +11,7 @@ import GIFEncoder from "gif-encoder-2"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE = "https://www.lightlinks.dev"
-const outPath = path.resolve(__dirname, "../public/demos/lightlinks-screencast.gif")
+const outPath = path.resolve(__dirname, "../public/demos/linklight-screencast.gif")
 
 const W = 480
 const H = 300

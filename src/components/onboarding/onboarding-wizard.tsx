@@ -154,7 +154,7 @@ export function OnboardingWizard() {
 
         {step === 0 && (
           <div className="text-center">
-            <h2 className="text-h2 font-bold text-brand-secondary">Welcome to kinkylink!</h2>
+            <h2 className="text-h2 font-bold text-brand-secondary">Welcome to linklight!</h2>
             <p className="mt-2 text-body text-[#575858]">
               Let&apos;s get you set up in under 2 minutes.
             </p>
@@ -202,7 +202,7 @@ export function OnboardingWizard() {
           <div className="text-center">
             <h2 className="text-h2 font-bold text-brand-secondary">Connect Your Google Account</h2>
             <p className="mt-2 text-body text-[#575858]">
-              kinkylink needs access to Gmail (to send emails) and Google Search Console (to monitor backlinks).
+              linklight needs access to Gmail (to send emails) and Google Search Console (to monitor backlinks).
             </p>
             <p className="mt-1 text-sm text-[#999999]">
               We only send emails you explicitly schedule. We never access your other emails.

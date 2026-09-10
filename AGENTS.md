@@ -16,9 +16,9 @@ See `auth-supabase-learnings.md` for specific lessons about:
 <!-- END:auth-learnings -->
 
 <!-- BEGIN:brand-guidelines -->
-## Brand: kinkylink
+## Brand: linklight
 
-Brand assets and full guide at `public/brand/kinkylink_brand.md`.
+Brand assets and full guide at `public/brand/linklight_brand.md`.
 
 ### Quick reference
 - **Primary:** Placebo Sky `#ECFBFD`
@@ -28,7 +28,7 @@ Brand assets and full guide at `public/brand/kinkylink_brand.md`.
 - **Text:** Black `#000000`
 - **Display font:** Calibre Thin (48px)
 - **Body font:** Calibre Light (16px)
-- **Logo:** `public/brand/kinklink_logo.png`
+- **Logo:** `public/brand/linklight_logo.png`
 - **Tailwind theme vars:** `--color-brand-{primary,secondary,accent,surface,text,white}`
 <!-- END:brand-guidelines -->
 

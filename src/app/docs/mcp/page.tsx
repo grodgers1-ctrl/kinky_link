@@ -30,8 +30,8 @@ export default async function McpDocsPage() {
       <header className="border-b border-[#DCDDDE] bg-brand-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/brand/kinklink_logo.png" alt="" className="h-7 w-auto" />
-            <span className="text-lg font-semibold text-brand-secondary">kinkylink</span>
+            <img src="/brand/linklight_logo.png" alt="" className="h-7 w-auto" />
+            <span className="text-lg font-semibold text-brand-secondary">linklight</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm">
             <Link href="/pricing" className="text-[#575858] hover:text-brand-secondary">
@@ -155,7 +155,7 @@ content-gap articles I could write to move them onto page 1.`}
 
       <footer className="border-t border-[#DCDDDE] bg-brand-white">
         <div className="mx-auto max-w-6xl px-6 py-6 text-xs text-[#999999]">
-          &copy; {new Date().getFullYear()} kinkylink
+          &copy; {new Date().getFullYear()} linklight
         </div>
       </footer>
     </div>

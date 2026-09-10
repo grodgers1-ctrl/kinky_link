@@ -4,7 +4,7 @@
 
 Dashboard included. But the agent is the point.
 
-![linklight demo](public/demos/lightlinks-screencast.gif)
+![linklight demo](public/demos/linklight-screencast.gif)
 
 [![MCP Server on Glama](https://glama.ai/mcp/servers/grodgers1-ctrl/kinky_link/badge)](https://glama.ai/mcp/servers/grodgers1-ctrl/kinky_link)
 

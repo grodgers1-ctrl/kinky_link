@@ -1,16 +1,16 @@
-# kinkylink Brand Guidelines
+# linklight Brand Guidelines
 
 ## **About**
-kinkylink provides premium, frictionless link-management tools designed for a community focused on side hustles and boosting overall income. It serves as a vital component within a broader ecosystem of growth-focused resources, integrating seamlessly alongside the self-publish toolkit and dividend calendar.
+linklight provides premium, frictionless link-building tools: it plugs into any MCP client and lets your AI agent find prospects, draft outreach, and monitor backlinks — you approve and send.
 
 ---
 
 ## **Logos & Marks**
 
 * **Primary Mark:** 
-![kinkylink Logo](kinklink_logo.png)
+![linklight Logo](linklight_logo.png)
 
-*(Note: Ensure the `kinklink_logo.png` file is placed in the same directory as this markdown file for the image to render correctly).*
+*(Note: Ensure the `linklight_logo.png` file is placed in the same directory as this markdown file for the image to render correctly).*
 
 ---
 
@@ -24,7 +24,7 @@ The brand's color identity is organized by role: the primary anchors the brand, 
 | :--- | :--- | :--- | :--- | :--- |
 | **Primary** | Placebo Sky | `#ECFBFD` | 236, 251, 253 | Appears in primary CTAs and bright highlighting. |
 | **Secondary** | Floppy Disk | `#140044` | 20, 0, 68 | The foundational brand color, used for the smooth ring in the logo and solid structure. |
-| **Accent** | Red Flag | `#FF224B` | 255, 34, 75 | The "kink." Highlights inflection points, upward momentum, and energetic elements. |
+| **Accent** | Red Flag | `#FF224B` | 255, 34, 75 | The spark. Highlights inflection points, upward momentum, and energetic elements. |
 | **Surface** | Off White | `#EDEEEF` | 237, 238, 239 | Backgrounds and app surfaces to keep the ui clean. |
 | **Text** | Black | `#000000` | 0, 0, 0 | Primary typography and the wordmark. |
 

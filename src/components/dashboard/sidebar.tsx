@@ -63,8 +63,8 @@ export function Sidebar() {
         )}
       >
         <div className="flex items-center gap-2 border-b border-[#DCDDDE] px-6 py-4">
-          <img src="/brand/kinklink_logo.png" alt="kinkylink" className="h-7 w-auto" />
-          <span className="text-h3 font-bold text-brand-secondary">kinkylink</span>
+          <img src="/brand/linklight_logo.png" alt="linklight" className="h-7 w-auto" />
+          <span className="text-h3 font-bold text-brand-secondary">linklight</span>
         </div>
         {nav}
       </aside>

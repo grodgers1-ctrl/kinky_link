@@ -72,5 +72,5 @@ list_backlinks — backlinks earned to your sites
 
 - [ ] Add a "Listed on" badges section to README once directories approve
 - [ ] Verify the endpoint responds from a fresh MCP client: `curl https://lightlinks.dev/api/mcp` returns `{"status":"ok",...}`
-- [ ] Keep the demo GIF (`public/demos/lightlinks-screencast.gif`) in the repo — directories with images convert better
+- [ ] Keep the demo GIF (`public/demos/linklight-screencast.gif`) in the repo — directories with images convert better
 - [ ] Keep `/docs/mcp` in sync with the tools table whenever new tools ship

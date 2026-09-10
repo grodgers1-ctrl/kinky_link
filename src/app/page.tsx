@@ -100,8 +100,8 @@ export default async function Home() {
       <header className="border-b border-[#DCDDDE] bg-brand-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <img src="/brand/kinklink_logo.png" alt="" className="h-7 w-auto" />
-            <span className="text-lg font-semibold text-brand-secondary">kinkylink</span>
+            <img src="/brand/linklight_logo.png" alt="" className="h-7 w-auto" />
+            <span className="text-lg font-semibold text-brand-secondary">linklight</span>
           </div>
           <nav className="flex items-center gap-6 text-sm">
             <Link href="/pricing" className="text-[#575858] hover:text-brand-secondary">
@@ -172,8 +172,8 @@ export default async function Home() {
             <div className="rounded-2xl border border-[#DCDDDE] bg-brand-white p-8 shadow-sm">
               <div className="text-center">
                 <img
-                  src="/brand/kinklink_logo.png"
-                  alt="kinkylink"
+                  src="/brand/linklight_logo.png"
+                  alt="linklight"
                   className="mx-auto h-14 w-auto"
                 />
                 <h2 className="mt-4 text-xl font-semibold text-brand-secondary">
@@ -189,7 +189,7 @@ export default async function Home() {
               </div>
 
               <p className="mt-4 text-center text-xs text-[#999999]">
-                By continuing you agree to let kinkylink send emails on your behalf and
+                By continuing you agree to let linklight send emails on your behalf and
                 read Search Console data. You can revoke access anytime.
               </p>
             </div>
@@ -273,8 +273,8 @@ export default async function Home() {
       <footer className="border-t border-[#DCDDDE] bg-brand-white">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-6 text-xs text-[#999999] sm:flex-row">
           <div className="flex items-center gap-2">
-            <img src="/brand/kinklink_logo.png" alt="" className="h-4 w-auto opacity-70" />
-            <span>&copy; {new Date().getFullYear()} kinkylink</span>
+            <img src="/brand/linklight_logo.png" alt="" className="h-4 w-auto opacity-70" />
+            <span>&copy; {new Date().getFullYear()} linklight</span>
           </div>
           <div className="flex items-center gap-5">
             <a
