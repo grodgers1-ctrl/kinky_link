@@ -12,7 +12,7 @@ const VERIFIED_MENTION_TTL_DAYS = 60
 // Moz free tier is 50 rows/month account-wide; stay under it with headroom.
 const MOZ_MONTHLY_ROW_LIMIT = Number(process.env.LL_MOZ_MONTHLY_ROW_LIMIT) || 45
 // Max CC linking domains resolved per find_competitor_backlinks call.
-const CC_RESOLVE_CAP = 25
+const CC_RESOLVE_CAP = 15
 
 const LINKABLE_TITLE_RE = /2024|2025|2026|best|top|review|vs|alternative|guide|resources|list|roundup|tools|directory|recommended|ultimate|complete/i
 

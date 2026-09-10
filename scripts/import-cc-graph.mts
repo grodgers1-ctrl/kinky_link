@@ -28,7 +28,7 @@ const DEFAULT_RELEASE = "cc-main-2026-may-jun-jul"
 const BASE = "https://data.commoncrawl.org/projects/hyperlinkgraph"
 const WORK_DIR = path.join(process.cwd(), "tmp", "cc-graph")
 const UPSERT_BATCH = 1000
-const MAX_SOURCES_PER_TARGET = 50_000
+const MAX_SOURCES_PER_TARGET = 250_000
 
 // --- small utils -------------------------------------------------------------
 
@@ -156,39 +156,85 @@ async function collectEdges(
   return sources
 }
 
-/** Pass 3: resolve source ids to domains, upserting in batches. */
-async function resolveAndStore(
+/** Pass 3a: resolve source ids to (still reversed) domain names. */
+async function resolveNames(
   lines: AsyncGenerator<string>,
   sources: Map<string, Set<number>>,
+): Promise<Map<number, string>> {
+  const wanted = new Set<number>()
+  for (const ids of sources.values()) for (const id of ids) wanted.add(id)
+  const idToRevName = new Map<number, string>()
+  for await (const line of lines) {
+    const tab1 = line.indexOf("\t")
+    if (tab1 === -1) continue
+    const id = Number(line.slice(0, tab1))
+    if (!wanted.has(id)) continue
+    const tab2 = line.indexOf("\t", tab1 + 1)
+    idToRevName.set(id, line.slice(tab1 + 1, tab2 === -1 ? undefined : tab2))
+  }
+  return idToRevName
+}
+
+/**
+ * Pass 3b: harmonic-centrality rank per reversed domain name, from the ranks
+ * file (columns: hc_pos, hc_val, pr_pos, pr_val, host_rev, n_hosts).
+ */
+async function resolveRanks(
+  lines: AsyncGenerator<string>,
+  revNames: Set<string>,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  for await (const line of lines) {
+    if (line.startsWith("#")) continue
+    const parts = line.split("\t")
+    if (parts.length < 5) continue
+    if (revNames.has(parts[4])) out.set(parts[4], Number(parts[1]))
+  }
+  return out
+}
+
+/** Keep at most this many best-ranked sources per target in the table. */
+const TOP_STORE_PER_TARGET = 5_000
+
+/** Store sources per target, best-ranked first, capped at TOP_STORE_PER_TARGET. */
+async function storeRanked(
+  sources: Map<string, Set<number>>,
+  idToRevName: Map<number, string>,
+  nameToRank: Map<string, number>,
   crawlId: string,
   dryRun: boolean,
 ): Promise<number> {
-  const idToTarget = new Map<number, string>()
-  for (const [target, ids] of sources) for (const id of ids) idToTarget.set(id, target)
-
   let stored = 0
-  let batch: { target_domain: string; source_domain: string; crawl_id: string }[] = []
+  let batch: { target_domain: string; source_domain: string; crawl_id: string; source_rank: number | null }[] = []
   const flush = async () => {
     if (batch.length === 0) return
     if (!dryRun) {
       const { error } = await supabaseAdmin
         .from("cc_link_graph")
-        .upsert(batch, { onConflict: "target_domain,source_domain,crawl_id", ignoreDuplicates: true })
+        .upsert(batch, { onConflict: "target_domain,source_domain,crawl_id", ignoreDuplicates: false })
       if (error) throw new Error(`cc_link_graph upsert failed: ${error.message}`)
     }
     stored += batch.length
     batch = []
   }
 
-  for await (const line of lines) {
-    const tab1 = line.indexOf("\t")
-    if (tab1 === -1) continue
-    const target = idToTarget.get(Number(line.slice(0, tab1)))
-    if (!target) continue
-    const tab2 = line.indexOf("\t", tab1 + 1)
-    const rev = line.slice(tab1 + 1, tab2 === -1 ? undefined : tab2)
-    batch.push({ target_domain: target, source_domain: unreversedName(rev), crawl_id: crawlId })
-    if (batch.length >= UPSERT_BATCH) await flush()
+  for (const [target, ids] of sources) {
+    const rows: { target_domain: string; source_domain: string; crawl_id: string; source_rank: number | null }[] = []
+    for (const id of ids) {
+      const rev = idToRevName.get(id)
+      if (!rev) continue
+      rows.push({
+        target_domain: target,
+        source_domain: unreversedName(rev),
+        crawl_id: crawlId,
+        source_rank: nameToRank.get(rev) ?? null,
+      })
+    }
+    rows.sort((a, b) => (b.source_rank ?? -1) - (a.source_rank ?? -1))
+    for (const row of rows.slice(0, TOP_STORE_PER_TARGET)) {
+      batch.push(row)
+      if (batch.length >= UPSERT_BATCH) await flush()
+    }
   }
   await flush()
   return stored
@@ -242,7 +288,8 @@ async function fixture(release: string) {
     process.exit(1)
   }
   const sources = await collectEdges(fixtureLines("edges"), targetIds)
-  const stored = await resolveAndStore(fixtureLines("vertices"), sources, `${release}-fixture`, false)
+  const idToRevName = await resolveNames(fixtureLines("vertices"), sources)
+  const stored = await storeRanked(sources, idToRevName, new Map(), `${release}-fixture`, false)
   console.log(`  stored ${stored} fixture edges`)
 
   const { data } = await supabaseAdmin
@@ -282,6 +329,11 @@ async function fullImport(release: string) {
     path.join(WORK_DIR, `${release}-edges.txt.gz`),
     "edges",
   )
+  const rPath = await downloadResumable(
+    `${BASE}/${release}/domain/${release}-domain-ranks.txt.gz`,
+    path.join(WORK_DIR, `${release}-ranks.txt.gz`),
+    "ranks",
+  )
 
   console.log("pass 1: matching targets in vertices...")
   const targetIds = await matchTargets(streamLines(vPath), list)
@@ -293,10 +345,16 @@ async function fullImport(release: string) {
   console.log("pass 2: scanning edges (this is the long one)...")
   const sources = await collectEdges(streamLines(ePath), targetIds)
 
-  console.log("pass 3: resolving + storing source domains...")
-  const stored = await resolveAndStore(streamLines(vPath), sources, release, false)
+  console.log("pass 3a: resolving source names...")
+  const idToRevName = await resolveNames(streamLines(vPath), sources)
+
+  console.log("pass 3b: resolving harmonic-centrality ranks...")
+  const nameToRank = await resolveRanks(streamLines(rPath), new Set(idToRevName.values()))
+
+  console.log("pass 3c: storing best-ranked sources...")
+  const stored = await storeRanked(sources, idToRevName, nameToRank, release, false)
   for (const [target, ids] of sources) {
-    console.log(`  ${target}: ${ids.size.toLocaleString()} linking domains`)
+    console.log(`  ${target}: ${ids.size.toLocaleString()} linking domains found, top ${Math.min(ids.size, TOP_STORE_PER_TARGET).toLocaleString()} stored`)
   }
   console.log(`\nIMPORT DONE — ${stored.toLocaleString()} edges stored for crawl ${release}`)
 }
