@@ -3,6 +3,7 @@ import { scrapeSerp } from "@/lib/scraper"
 import { getMozMetrics, mozConfigured } from "@/lib/moz"
 import { verifyLinkTarget } from "@/lib/link-verifier"
 import { trackCompetitorQuery, getCcLinkingDomains, resolveCandidateUrls } from "@/lib/cc-graph"
+import { isPlatformDomain } from "@/lib/platform-blocklist"
 import pLimit from "p-limit"
 
 const SERP_TTL_DAYS = 30
@@ -434,7 +435,7 @@ export async function getCompetitorBacklinks(opts: {
   try {
     const linking = await getCcLinkingDomains(competitorDomain)
     const freshSources = linking.filter(
-      (l) => !isExcludedDomain(l.source_domain, exclude),
+      (l) => !isExcludedDomain(l.source_domain, exclude) && !isPlatformDomain(l.source_domain),
     )
     ccLinkingDomains = freshSources.length
     const ccLimiter = pLimit(4)
@@ -480,7 +481,7 @@ export async function getCompetitorBacklinks(opts: {
   }
 
   const serpCandidates = (rows as CandidateRow[]).filter(
-    (r) => !isExcludedDomain(String(r.domain), exclude),
+    (r) => !isExcludedDomain(String(r.domain), exclude) && !isPlatformDomain(String(r.domain)),
   )
   // CC candidates first: verified real linkers take precedence in dedupe.
   // Backfill title/description from SERP rows so CC rows aren't title-less.
